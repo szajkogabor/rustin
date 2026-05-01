@@ -1,10 +1,19 @@
-use crate::store::Board;
+use crate::commands::list::{kind_emoji, priority_emoji};
+use crate::store::{Board, TaskStatus};
 use clap::Args;
 
 #[derive(Args)]
 pub struct ShowCommand {
     /// ID of the task to show
     pub id: u32,
+}
+
+fn status_label(status: &TaskStatus) -> &'static str {
+    match status {
+        TaskStatus::Todo => "Todo",
+        TaskStatus::InProgress => "In Progress",
+        TaskStatus::Done => "Done",
+    }
 }
 
 impl ShowCommand {
@@ -19,9 +28,13 @@ impl ShowCommand {
 
         println!("ID:          {}", task.id);
         println!("Title:       {}", task.title);
-        println!("Kind:        {:?}", task.kind);
-        println!("Priority:    {:?}", task.priority);
-        println!("Status:      {:?}", task.status);
+        println!("Kind:        {:?} {}", task.kind, kind_emoji(task.kind));
+        println!(
+            "Priority:    {:?} {}",
+            task.priority,
+            priority_emoji(task.priority)
+        );
+        println!("Status:      {}", status_label(&task.status));
         println!(
             "Created:     {}",
             task.created_at.format("%Y-%m-%d %H:%M:%S UTC")
@@ -33,14 +46,27 @@ impl ShowCommand {
             println!("History:");
             for t in &task.transitions {
                 println!(
-                    "  {:?} → {:?}  ({})",
-                    t.from,
-                    t.to,
+                    "  {} → {}  ({})",
+                    status_label(&t.from),
+                    status_label(&t.to),
                     t.at.format("%Y-%m-%d %H:%M:%S UTC")
                 );
             }
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::status_label;
+    use crate::store::TaskStatus;
+
+    #[test]
+    fn status_label_maps_all_statuses() {
+        assert_eq!(status_label(&TaskStatus::Todo), "Todo");
+        assert_eq!(status_label(&TaskStatus::InProgress), "In Progress");
+        assert_eq!(status_label(&TaskStatus::Done), "Done");
     }
 }

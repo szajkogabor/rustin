@@ -43,9 +43,9 @@ impl ListCommand {
         in_progress.sort_by(task_order);
         done.sort_by(task_order);
 
-        let todos: Vec<String> = todos.iter().map(format_task).collect();
-        let in_progress: Vec<String> = in_progress.iter().map(format_task).collect();
-        let done: Vec<String> = done.iter().map(format_task).collect();
+        let todos: Vec<(String, String)> = todos.iter().map(format_task).collect();
+        let in_progress: Vec<(String, String)> = in_progress.iter().map(format_task).collect();
+        let done: Vec<(String, String)> = done.iter().map(format_task).collect();
 
         println!("=== {} ===", board.title);
 
@@ -67,9 +67,13 @@ impl ListCommand {
     }
 }
 
-fn print_columns(todo: Option<&[String]>, in_progress: Option<&[String]>, done: Option<&[String]>) {
+fn print_columns(
+    todo: Option<&[(String, String)]>,
+    in_progress: Option<&[(String, String)]>,
+    done: Option<&[(String, String)]>,
+) {
     // Build the list of active columns: (header, rows)
-    let mut cols: Vec<(&str, &[String])> = Vec::new();
+    let mut cols: Vec<(&str, &[(String, String)])> = Vec::new();
     if let Some(rows) = todo {
         cols.push(("Todo", rows));
     }
@@ -94,7 +98,14 @@ fn print_columns(todo: Option<&[String]>, in_progress: Option<&[String]>, done: 
         .iter()
         .map(|(header, rows)| {
             rows.iter()
-                .map(|v| v.chars().count())
+                .map(|(main, suffix)| {
+                    main.chars().count()
+                        + if suffix.is_empty() {
+                            0
+                        } else {
+                            1 + suffix.chars().count()
+                        }
+                })
                 .max()
                 .unwrap_or(0)
                 .max(header.len())
@@ -117,8 +128,21 @@ fn print_columns(todo: Option<&[String]>, in_progress: Option<&[String]>, done: 
             .iter()
             .zip(widths.iter())
             .map(|((_, rows), w)| {
-                let cell = rows.get(i).map_or("", String::as_str);
-                format!("{:w$}", truncate(cell, *w))
+                let (main, suffix) = rows
+                    .get(i)
+                    .map_or(("", ""), |(m, s)| (m.as_str(), s.as_str()));
+                let suffix_chars = if suffix.is_empty() {
+                    0
+                } else {
+                    1 + suffix.chars().count()
+                };
+                let main_budget = w.saturating_sub(suffix_chars);
+                let cell = if suffix.is_empty() {
+                    truncate(main, *w)
+                } else {
+                    format!("{} {}", truncate(main, main_budget), suffix)
+                };
+                format!("{:w$}", cell)
             })
             .collect();
         println!("{}", row_parts.join(" | "));
@@ -146,14 +170,10 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-fn format_task(t: &&Task) -> String {
-    format!(
-        "{} [{}] {} {}",
-        priority_emoji(t.priority),
-        t.id,
-        t.title,
-        kind_emoji(t.kind)
-    )
+fn format_task(t: &&Task) -> (String, String) {
+    let main = format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title);
+    let suffix = kind_emoji(t.kind).to_string();
+    (main, suffix)
 }
 
 fn task_order(left: &&Task, right: &&Task) -> Ordering {
@@ -164,7 +184,7 @@ fn task_order(left: &&Task, right: &&Task) -> Ordering {
         .then_with(|| left.id.cmp(&right.id))
 }
 
-fn priority_emoji(priority: TaskPriority) -> &'static str {
+pub(crate) fn priority_emoji(priority: TaskPriority) -> &'static str {
     match priority {
         TaskPriority::High => "🔥",
         TaskPriority::Medium => "🌶️",
@@ -172,7 +192,7 @@ fn priority_emoji(priority: TaskPriority) -> &'static str {
     }
 }
 
-fn kind_emoji(kind: TaskKind) -> &'static str {
+pub(crate) fn kind_emoji(kind: TaskKind) -> &'static str {
     match kind {
         TaskKind::Feature => "✨",
         TaskKind::Bug => "🐛",
@@ -182,7 +202,7 @@ fn kind_emoji(kind: TaskKind) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{kind_emoji, priority_emoji, task_order};
+    use super::{format_task, kind_emoji, priority_emoji, task_order, truncate};
     use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, Utc};
 
@@ -213,6 +233,37 @@ mod tests {
 
         let ids: Vec<u32> = tasks.into_iter().map(|task| task.id).collect();
         assert_eq!(ids, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn truncate_keeps_short_string_unchanged() {
+        assert_eq!(truncate("hello", 10), "hello");
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_cuts_long_string_with_ellipsis() {
+        assert_eq!(truncate("hello world", 7), "hello …");
+        assert_eq!(truncate("abcdef", 4), "abc…");
+    }
+
+    #[test]
+    fn format_task_produces_correct_parts() {
+        let now = Utc::now();
+        let task = make_task(42, TaskPriority::High, now);
+        let task_ref = &task;
+        let (main, suffix) = format_task(&task_ref);
+        assert_eq!(main, "🔥 [42] task-42");
+        assert_eq!(suffix, "✨");
+    }
+
+    #[test]
+    fn format_task_bug_kind_produces_bug_emoji() {
+        let now = Utc::now();
+        let mut task = make_task(1, TaskPriority::Low, now);
+        task.kind = TaskKind::Bug;
+        let (_, suffix) = format_task(&&task);
+        assert_eq!(suffix, "🐛");
     }
 
     #[test]
