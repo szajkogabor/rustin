@@ -19,7 +19,7 @@ impl InitCommand {
         }
 
         board.save()?;
-        crate::commands::list::ListCommand {}.run()?;
+        crate::commands::list::ListCommand { columns: vec![] }.run()?;
 
         Ok(())
     }

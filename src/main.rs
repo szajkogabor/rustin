@@ -111,7 +111,9 @@ fn main() -> anyhow::Result<()> {
 
     let command = cli
         .command
-        .unwrap_or(Commands::List(commands::list::ListCommand {}));
+        .unwrap_or(Commands::List(commands::list::ListCommand {
+            columns: vec![],
+        }));
 
     match command {
         Commands::Add(cmd) => cmd.run()?,

@@ -1,12 +1,26 @@
 use crate::store::{Board, Task, TaskKind, TaskPriority, TaskStatus};
-use clap::Args;
+use clap::{Args, ValueEnum};
 use std::cmp::Ordering;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Column {
+    Todo,
+    Inprogress,
+    Done,
+}
+
 #[derive(Args)]
-pub struct ListCommand {}
+pub struct ListCommand {
+    /// Columns to display (default: all)
+    #[arg(short, long, value_enum, num_args = 1..)]
+    pub columns: Vec<Column>,
+}
 
 impl ListCommand {
     pub fn run(&self) -> anyhow::Result<()> {
+        let show_all = self.columns.is_empty();
+        let show = |col: Column| show_all || self.columns.contains(&col);
+
         let board = Board::load()?;
 
         let mut todos: Vec<_> = board
@@ -66,72 +80,81 @@ impl ListCommand {
             })
             .collect();
 
-        let max_len = todos.len().max(in_progress.len()).max(done.len());
-
         println!("=== {} ===", board.title);
 
-        if max_len == 0 {
+        let todo_col = show(Column::Todo).then_some(todos.as_slice());
+        let inprogress_col = show(Column::Inprogress).then_some(in_progress.as_slice());
+        let done_col = show(Column::Done).then_some(done.as_slice());
+
+        let total = todo_col.map_or(0, |c| c.len())
+            + inprogress_col.map_or(0, |c| c.len())
+            + done_col.map_or(0, |c| c.len());
+
+        if total == 0 && board.tasks.is_empty() {
             println!("The board is empty. Add a task with `rustin add \"Task title\"`");
         } else {
-            print_columns(&todos, &in_progress, &done);
+            print_columns(todo_col, inprogress_col, done_col);
         }
 
         Ok(())
     }
 }
 
-fn print_columns(todo: &[String], in_progress: &[String], done: &[String]) {
-    let todo_header = "Todo";
-    let in_progress_header = "In Progress";
-    let done_header = "Done";
+fn print_columns(todo: Option<&[String]>, in_progress: Option<&[String]>, done: Option<&[String]>) {
+    // Build the list of active columns: (header, rows)
+    let mut cols: Vec<(&str, &[String])> = Vec::new();
+    if let Some(rows) = todo {
+        cols.push(("Todo", rows));
+    }
+    if let Some(rows) = in_progress {
+        cols.push(("In Progress", rows));
+    }
+    if let Some(rows) = done {
+        cols.push(("Done", rows));
+    }
 
-    let todo_content_width = todo
+    if cols.is_empty() {
+        return;
+    }
+
+    // Fit within terminal width
+    let separators = " | ".len() * cols.len().saturating_sub(1);
+    let term_width = terminal_width();
+    let available = term_width.saturating_sub(separators);
+    let col_cap = (available / cols.len()).max(10);
+
+    let widths: Vec<usize> = cols
         .iter()
-        .map(|v| v.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(todo_header.len());
-    let in_progress_content_width = in_progress
+        .map(|(header, rows)| {
+            rows.iter()
+                .map(|v| v.chars().count())
+                .max()
+                .unwrap_or(0)
+                .max(header.len())
+                .min(col_cap)
+        })
+        .collect();
+
+    // Header row
+    let header_parts: Vec<String> = cols
         .iter()
-        .map(|v| v.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(in_progress_header.len());
-    let done_content_width = done
-        .iter()
-        .map(|v| v.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(done_header.len());
+        .zip(widths.iter())
+        .map(|((header, _), w)| format!("{:w$}", header))
+        .collect();
+    println!("{}", header_parts.join(" | "));
 
-    // Fit within terminal width: 3 columns + 2 separators " | " (3 chars each)
-    let terminal_width = terminal_width();
-    let separators = 6; // " | " twice
-    let available = terminal_width.saturating_sub(separators);
-    let col_cap = (available / 3).max(10);
-
-    let todo_width = todo_content_width.min(col_cap);
-    let in_progress_width = in_progress_content_width.min(col_cap);
-    let done_width = done_content_width.min(col_cap);
-
-    println!(
-        "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
-        todo_header, in_progress_header, done_header
-    );
-
-    let max_len = todo.len().max(in_progress.len()).max(done.len());
-    for i in 0..max_len {
-        let todo_value = truncate(todo.get(i).map_or("", String::as_str), todo_width);
-        let in_progress_value = truncate(
-            in_progress.get(i).map_or("", String::as_str),
-            in_progress_width,
-        );
-        let done_value = truncate(done.get(i).map_or("", String::as_str), done_width);
-
-        println!(
-            "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
-            todo_value, in_progress_value, done_value
-        );
+    // Data rows
+    let max_rows = cols.iter().map(|(_, rows)| rows.len()).max().unwrap_or(0);
+    for i in 0..max_rows {
+        let row_parts: Vec<String> = cols
+            .iter()
+            .zip(widths.iter())
+            .map(|((_, rows), w)| {
+                let cell = rows.get(i).map_or("", String::as_str);
+                format!("{:w$}", truncate(cell, *w))
+            })
+            .collect();
+        println!("{}", row_parts.join(" | "));
     }
 }
 

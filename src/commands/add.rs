@@ -42,7 +42,7 @@ impl AddCommand {
 
         tracing::info!("Task added successfully: [{}] {}", task.id, task.title);
 
-        crate::commands::list::ListCommand {}.run()?;
+        crate::commands::list::ListCommand { columns: vec![] }.run()?;
         Ok(())
     }
 }
