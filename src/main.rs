@@ -70,6 +70,9 @@ enum Commands {
     Edit(commands::edit::EditCommand),
     /// Initialize a new board or set its title
     Init(commands::init::InitCommand),
+    /// Open an interactive terminal UI
+    #[command(visible_alias = "ui")]
+    Tui(commands::tui::TuiCommand),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -125,6 +128,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Show(cmd) => cmd.run()?,
         Commands::Edit(cmd) => cmd.run()?,
         Commands::Init(cmd) => cmd.run()?,
+        Commands::Tui(cmd) => cmd.run()?,
     }
 
     Ok(())

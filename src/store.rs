@@ -159,11 +159,40 @@ impl Board {
         fs::write(path, content)?;
         Ok(())
     }
+
+    pub fn move_task(&mut self, id: u32, to: TaskStatus) -> bool {
+        if let Some(task) = self.tasks.iter_mut().find(|task| task.id == id) {
+            let from = task.status.clone();
+            task.transitions.push(StatusTransition {
+                from,
+                to: to.clone(),
+                at: chrono::Utc::now(),
+            });
+            task.status = to;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Board, TaskKind, TaskPriority, TaskStatus, current_version};
+    use super::{Board, Task, TaskKind, TaskPriority, TaskStatus, current_version};
+    use chrono::Utc;
+
+    fn make_task(id: u32, status: TaskStatus) -> Task {
+        Task {
+            id,
+            title: format!("task-{id}"),
+            priority: TaskPriority::Medium,
+            kind: TaskKind::Feature,
+            description: None,
+            status,
+            created_at: Utc::now(),
+            transitions: vec![],
+        }
+    }
 
     #[test]
     fn default_board_is_initialized_consistently() {
@@ -227,5 +256,35 @@ mod tests {
         let json = r#"{"title":"MyBoard","next_id":1,"tasks":[]}"#;
         let board: Board = serde_json::from_str(json).unwrap();
         assert_eq!(board.version, "0.0.0");
+    }
+
+    #[test]
+    fn move_task_updates_status_and_history() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        assert!(board.move_task(1, TaskStatus::Done));
+
+        let task = &board.tasks[0];
+        assert_eq!(task.status, TaskStatus::Done);
+        assert_eq!(task.transitions.len(), 1);
+        assert_eq!(task.transitions[0].from, TaskStatus::Todo);
+        assert_eq!(task.transitions[0].to, TaskStatus::Done);
+    }
+
+    #[test]
+    fn move_task_returns_false_when_missing() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 1,
+            tasks: vec![],
+        };
+
+        assert!(!board.move_task(99, TaskStatus::Done));
     }
 }

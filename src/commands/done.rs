@@ -1,5 +1,4 @@
-use crate::store::{Board, StatusTransition, TaskStatus};
-use chrono::Utc;
+use crate::store::{Board, TaskStatus};
 use clap::Args;
 
 #[derive(Args)]
@@ -12,14 +11,7 @@ impl DoneCommand {
     pub fn run(&self) -> anyhow::Result<()> {
         let mut board = Board::load()?;
 
-        if let Some(task) = board.tasks.iter_mut().find(|t| t.id == self.id) {
-            let from = task.status.clone();
-            task.transitions.push(StatusTransition {
-                from,
-                to: TaskStatus::Done,
-                at: Utc::now(),
-            });
-            task.status = TaskStatus::Done;
+        if board.move_task(self.id, TaskStatus::Done) {
             board.save()?;
             tracing::info!("Task {} moved to Done", self.id);
         } else {

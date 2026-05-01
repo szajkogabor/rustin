@@ -176,7 +176,7 @@ fn format_task(t: &&Task) -> (String, String) {
     (main, suffix)
 }
 
-fn task_order(left: &&Task, right: &&Task) -> Ordering {
+pub(crate) fn task_order(left: &&Task, right: &&Task) -> Ordering {
     right
         .priority
         .cmp(&left.priority)
