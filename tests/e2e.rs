@@ -434,7 +434,8 @@ fn stat_summarizes_completed_inprogress_time() {
         .stdout(predicate::str::contains("[1] Write release notes"))
         .stdout(predicate::str::contains("1h 30m 00s"))
         .stdout(predicate::str::contains("[2] Clean up warnings"))
-        .stdout(predicate::str::contains("45m 00s"));
+        .stdout(predicate::str::contains("45m 00s"))
+        .stdout(predicate::str::contains("runs:1"));
 }
 
 #[test]

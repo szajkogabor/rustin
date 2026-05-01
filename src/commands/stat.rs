@@ -28,12 +28,6 @@ impl StatCommand {
             .iter()
             .fold(Duration::zero(), |sum, stat| sum + stat.total_active_time);
         let completed_cycles: usize = stats.iter().map(|stat| stat.completed_cycles).sum();
-        let max_duration = stats
-            .iter()
-            .map(|stat| stat.total_active_time)
-            .max()
-            .unwrap_or_else(Duration::zero);
-
         println!("=== {} stats ===", board.title);
         println!("Tasks:           {}", board.tasks.len());
         println!("Completed runs:  {}", completed_cycles);
@@ -46,13 +40,13 @@ impl StatCommand {
         }
 
         println!("Per task:");
-        for stat in stats {
+        for stat in &stats {
             println!(
-                "[{}] {:<24} {:>10}  {}",
+                "[{}] {:<24} {:>10}  runs:{}",
                 stat.id,
                 truncate(&stat.title, 24),
                 format_duration(stat.total_active_time),
-                duration_bar(stat.total_active_time, max_duration)
+                stat.completed_cycles,
             );
         }
 
@@ -103,19 +97,6 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
-fn duration_bar(duration: Duration, max_duration: Duration) -> String {
-    const BAR_WIDTH: i64 = 16;
-
-    if duration <= Duration::zero() || max_duration <= Duration::zero() {
-        return String::new();
-    }
-
-    let filled = ((duration.num_milliseconds() * BAR_WIDTH) / max_duration.num_milliseconds())
-        .clamp(1, BAR_WIDTH);
-
-    "█".repeat(filled as usize)
-}
-
 fn truncate(value: &str, max_chars: usize) -> String {
     let chars: Vec<char> = value.chars().collect();
     if chars.len() <= max_chars {
@@ -128,7 +109,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TaskStat, duration_bar, format_duration, task_stat};
+    use super::{TaskStat, format_duration, task_stat};
     use crate::store::{StatusTransition, Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, TimeZone, Utc};
 
@@ -209,10 +190,14 @@ mod tests {
     }
 
     #[test]
-    fn duration_bar_scales_to_max_duration() {
-        assert_eq!(
-            duration_bar(Duration::minutes(30), Duration::hours(1)),
-            "████████"
-        );
+    fn task_stat_keeps_completed_cycle_count() {
+        let stats = [TaskStat {
+            id: 1,
+            title: "task".to_string(),
+            total_active_time: Duration::minutes(10),
+            completed_cycles: 2,
+        }];
+
+        assert_eq!(stats[0].completed_cycles, 2);
     }
 }
