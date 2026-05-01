@@ -1,4 +1,5 @@
 use crate::commands::list::{kind_emoji, priority_emoji, task_order};
+use crate::commands::show::task_detail_lines;
 use crate::store::{Board, Task, TaskStatus};
 use anyhow::Context;
 use clap::Args;
@@ -11,7 +12,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 use std::io::{self, Stdout};
 
@@ -31,11 +32,21 @@ impl TuiCommand {
                     continue;
                 }
 
+                if app.showing_details() {
+                    match key.code {
+                        KeyCode::Enter | KeyCode::Esc => app.close_details(),
+                        KeyCode::Char('q') => break,
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 match key.code {
                     KeyCode::Up => app.select_previous(),
                     KeyCode::Down => app.select_next(),
                     KeyCode::Left => app.select_left(),
                     KeyCode::Right => app.select_right(),
+                    KeyCode::Enter => app.open_details()?,
                     KeyCode::Char('t') => app.move_selected(TaskStatus::Todo)?,
                     KeyCode::Char('i') => app.move_selected(TaskStatus::InProgress)?,
                     KeyCode::Char('d') => app.move_selected(TaskStatus::Done)?,
@@ -205,6 +216,7 @@ struct App {
     title: String,
     columns: TaskColumns,
     selected: Option<Selection>,
+    detail_lines: Option<Vec<String>>,
     status_line: String,
 }
 
@@ -222,15 +234,21 @@ impl App {
         let status_line = if selected.is_none() {
             "No tasks yet. Press q to quit.".to_string()
         } else {
-            "Arrow keys move across the board. t/i/d change status. q quits.".to_string()
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. q quits."
+                .to_string()
         };
 
         Ok(Self {
             title: board.title,
             columns,
             selected,
+            detail_lines: None,
             status_line,
         })
+    }
+
+    fn showing_details(&self) -> bool {
+        self.detail_lines.is_some()
     }
 
     fn selected_task_id(&self) -> Option<u32> {
@@ -315,6 +333,33 @@ impl App {
         Ok(())
     }
 
+    fn open_details(&mut self) -> anyhow::Result<()> {
+        let Some(task_id) = self.selected_task_id() else {
+            self.status_line = "No task selected.".to_string();
+            return Ok(());
+        };
+
+        let board = Board::load()?;
+        let Some(task) = board.tasks.iter().find(|task| task.id == task_id) else {
+            self.status_line = format!("Task {task_id} no longer exists.");
+            return Ok(());
+        };
+
+        self.detail_lines = Some(task_detail_lines(task));
+        self.status_line = format!("Viewing task {task_id}. Press Enter or Esc to close.");
+        Ok(())
+    }
+
+    fn close_details(&mut self) {
+        self.detail_lines = None;
+        self.status_line = if self.selected.is_some() {
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. q quits."
+                .to_string()
+        } else {
+            "No tasks yet. Press q to quit.".to_string()
+        };
+    }
+
     fn render(&self, frame: &mut Frame) {
         let areas = Layout::default()
             .direction(Direction::Vertical)
@@ -369,6 +414,10 @@ impl App {
         let footer =
             Paragraph::new(self.status_line.as_str()).style(Style::default().fg(Color::Yellow));
         frame.render_widget(footer, areas[2]);
+
+        if let Some(lines) = &self.detail_lines {
+            self.render_detail_overlay(frame, lines);
+        }
     }
 
     fn render_column(&self, frame: &mut Frame, area: ratatui::layout::Rect, column: TaskColumn) {
@@ -415,6 +464,44 @@ impl App {
 
         frame.render_stateful_widget(list, area, &mut state);
     }
+
+    fn render_detail_overlay(&self, frame: &mut Frame, lines: &[String]) {
+        let popup_area = centered_rect(75, 70, frame.area());
+        let content = lines
+            .iter()
+            .map(|line| Line::from(line.as_str()))
+            .collect::<Vec<_>>();
+        let popup = Paragraph::new(content)
+            .wrap(Wrap { trim: false })
+            .block(Block::default().borders(Borders::ALL).title("Task details"));
+
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup, popup_area);
+    }
+}
+
+fn centered_rect(
+    horizontal_percent: u16,
+    vertical_percent: u16,
+    area: ratatui::layout::Rect,
+) -> ratatui::layout::Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - vertical_percent) / 2),
+            Constraint::Percentage(vertical_percent),
+            Constraint::Percentage((100 - vertical_percent) / 2),
+        ])
+        .split(area);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - horizontal_percent) / 2),
+            Constraint::Percentage(horizontal_percent),
+            Constraint::Percentage((100 - horizontal_percent) / 2),
+        ])
+        .split(vertical[1])[1]
 }
 
 fn split_tasks(tasks: &[Task]) -> TaskColumns {
@@ -483,6 +570,7 @@ mod tests {
             title: "Board".to_string(),
             columns,
             selected,
+            detail_lines: None,
             status_line: String::new(),
         }
     }
@@ -570,6 +658,23 @@ mod tests {
                 index: 0,
             })
         );
+    }
+
+    #[test]
+    fn close_details_clears_overlay_and_restores_status_message() {
+        let mut app = app_with_columns(
+            columns(&[1], &[], &[]),
+            Some(Selection {
+                column: TaskColumn::Todo,
+                index: 0,
+            }),
+        );
+        app.detail_lines = Some(vec!["ID: 1".to_string()]);
+
+        app.close_details();
+
+        assert!(app.detail_lines.is_none());
+        assert!(app.status_line.contains("Enter shows details"));
     }
 
     #[test]
