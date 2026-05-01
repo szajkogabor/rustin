@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::fs;
 use tempfile::TempDir;
 
 /// Spawn the rustin binary with its cwd set to an isolated temp directory.
@@ -27,6 +28,36 @@ fn init_sets_board_title() {
 fn init_without_title_succeeds() {
     let dir = TempDir::new().unwrap();
     cmd(&dir).args(["init"]).assert().success();
+}
+
+#[test]
+fn init_from_nested_directory_uses_project_root_for_title_and_file() {
+    let dir = TempDir::new().unwrap();
+    let project_dir = dir.path().join("project");
+    let nested_dir = project_dir.join("subdir");
+    fs::create_dir_all(&nested_dir).unwrap();
+    fs::write(
+        project_dir.join("Cargo.toml"),
+        "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(&nested_dir);
+    command
+        .args(["init"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("=== project ==="));
+
+    assert!(project_dir.join(".rustin.json").exists());
+    assert!(!nested_dir.join(".rustin.json").exists());
+
+    let board = fs::read_to_string(project_dir.join(".rustin.json")).unwrap();
+    assert!(
+        board.contains("\"title\": \"project\""),
+        "board was:\n{board}"
+    );
 }
 
 // ---------------------------------------------------------------------------
