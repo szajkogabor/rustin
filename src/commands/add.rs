@@ -12,6 +12,10 @@ pub struct AddCommand {
     /// Task kind
     #[arg(short, long, value_enum, default_value_t = crate::store::TaskKind::Feature)]
     pub kind: crate::store::TaskKind,
+
+    /// Optional description
+    #[arg(short, long)]
+    pub description: Option<String>,
 }
 
 use crate::store::{Board, Task, TaskStatus};
@@ -26,6 +30,7 @@ impl AddCommand {
             title: self.title.clone(),
             priority: self.priority,
             kind: self.kind,
+            description: self.description.clone(),
             status: TaskStatus::Todo,
             created_at: Utc::now(),
         };

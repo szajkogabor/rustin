@@ -10,6 +10,8 @@ pub struct Task {
     pub priority: TaskPriority,
     #[serde(default)]
     pub kind: TaskKind,
+    #[serde(default)]
+    pub description: Option<String>,
     pub status: TaskStatus,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }

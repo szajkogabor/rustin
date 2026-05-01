@@ -158,6 +158,7 @@ mod tests {
             title: format!("task-{id}"),
             priority,
             kind: TaskKind::Feature,
+            description: None,
             status: TaskStatus::Todo,
             created_at,
         }
