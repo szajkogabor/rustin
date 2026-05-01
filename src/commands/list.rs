@@ -1,4 +1,4 @@
-use crate::store::{Board, Task, TaskStatus};
+use crate::store::{Board, Task, TaskPriority, TaskStatus};
 use clap::Args;
 use std::cmp::Ordering;
 use tabled::{Table, Tabled, settings::Style};
@@ -47,15 +47,15 @@ impl ListCommand {
             rows.push(BoardRow {
                 todo: todos
                     .get(i)
-                    .map(|t| format!("[{}] {}", t.id, t.title))
+                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
                     .unwrap_or_default(),
                 in_progress: in_progress
                     .get(i)
-                    .map(|t| format!("[{}] {}", t.id, t.title))
+                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
                     .unwrap_or_default(),
                 done: done
                     .get(i)
-                    .map(|t| format!("[{}] {}", t.id, t.title))
+                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
                     .unwrap_or_default(),
             });
         }
@@ -80,4 +80,52 @@ fn task_order(left: &&Task, right: &&Task) -> Ordering {
         .cmp(&left.priority)
         .then_with(|| left.created_at.cmp(&right.created_at))
         .then_with(|| left.id.cmp(&right.id))
+}
+
+fn priority_emoji(priority: TaskPriority) -> &'static str {
+    match priority {
+        TaskPriority::High => "🔥",
+        TaskPriority::Medium => "🌶️",
+        TaskPriority::Low => "🧊",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{priority_emoji, task_order};
+    use crate::store::{Task, TaskPriority, TaskStatus};
+    use chrono::{Duration, Utc};
+
+    fn make_task(id: u32, priority: TaskPriority, created_at: chrono::DateTime<Utc>) -> Task {
+        Task {
+            id,
+            title: format!("task-{id}"),
+            priority,
+            status: TaskStatus::Todo,
+            created_at,
+        }
+    }
+
+    #[test]
+    fn task_order_sorts_by_priority_then_date_then_id() {
+        let now = Utc::now();
+        let mut tasks = vec![
+            make_task(3, TaskPriority::Medium, now - Duration::minutes(10)),
+            make_task(2, TaskPriority::High, now - Duration::minutes(5)),
+            make_task(1, TaskPriority::High, now - Duration::minutes(5)),
+            make_task(4, TaskPriority::Low, now - Duration::minutes(20)),
+        ];
+
+        tasks.sort_by(|left, right| task_order(&left, &right));
+
+        let ids: Vec<u32> = tasks.into_iter().map(|task| task.id).collect();
+        assert_eq!(ids, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn priority_emoji_maps_all_priorities() {
+        assert_eq!(priority_emoji(TaskPriority::High), "🔥");
+        assert_eq!(priority_emoji(TaskPriority::Medium), "🌶️");
+        assert_eq!(priority_emoji(TaskPriority::Low), "🧊");
+    }
 }

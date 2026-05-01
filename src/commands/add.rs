@@ -1,30 +1,13 @@
 use clap::Args;
 
-#[derive(clap::ValueEnum, Clone, Copy)]
-pub enum PriorityArg {
-    Low,
-    Medium,
-    High,
-}
-
-impl From<PriorityArg> for crate::store::TaskPriority {
-    fn from(value: PriorityArg) -> Self {
-        match value {
-            PriorityArg::Low => Self::Low,
-            PriorityArg::Medium => Self::Medium,
-            PriorityArg::High => Self::High,
-        }
-    }
-}
-
 #[derive(Args)]
 pub struct AddCommand {
     /// The title of the task to add
     pub title: String,
 
     /// Task priority
-    #[arg(short, long, value_enum, default_value_t = PriorityArg::Medium)]
-    pub priority: PriorityArg,
+    #[arg(short, long, value_enum, default_value_t = crate::store::TaskPriority::Medium)]
+    pub priority: crate::store::TaskPriority,
 }
 
 use crate::store::{Board, Task, TaskStatus};
@@ -37,7 +20,7 @@ impl AddCommand {
         let task = Task {
             id: board.next_id,
             title: self.title.clone(),
-            priority: self.priority.into(),
+            priority: self.priority,
             status: TaskStatus::Todo,
             created_at: Utc::now(),
         };
