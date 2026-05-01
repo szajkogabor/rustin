@@ -43,42 +43,9 @@ impl ListCommand {
         in_progress.sort_by(task_order);
         done.sort_by(task_order);
 
-        let todos: Vec<String> = todos
-            .iter()
-            .map(|t| {
-                format!(
-                    "{} [{}] {} {}",
-                    priority_emoji(t.priority),
-                    t.id,
-                    t.title,
-                    kind_emoji(t.kind)
-                )
-            })
-            .collect();
-        let in_progress: Vec<String> = in_progress
-            .iter()
-            .map(|t| {
-                format!(
-                    "{} [{}] {} {}",
-                    priority_emoji(t.priority),
-                    t.id,
-                    t.title,
-                    kind_emoji(t.kind)
-                )
-            })
-            .collect();
-        let done: Vec<String> = done
-            .iter()
-            .map(|t| {
-                format!(
-                    "{} [{}] {} {}",
-                    priority_emoji(t.priority),
-                    t.id,
-                    t.title,
-                    kind_emoji(t.kind)
-                )
-            })
-            .collect();
+        let todos: Vec<String> = todos.iter().map(format_task).collect();
+        let in_progress: Vec<String> = in_progress.iter().map(format_task).collect();
+        let done: Vec<String> = done.iter().map(format_task).collect();
 
         println!("=== {} ===", board.title);
 
@@ -177,6 +144,16 @@ fn truncate(s: &str, max: usize) -> String {
         let cut = max.saturating_sub(1);
         chars[..cut].iter().collect::<String>() + "…"
     }
+}
+
+fn format_task(t: &&Task) -> String {
+    format!(
+        "{} [{}] {} {}",
+        priority_emoji(t.priority),
+        t.id,
+        t.title,
+        kind_emoji(t.kind)
+    )
 }
 
 fn task_order(left: &&Task, right: &&Task) -> Ordering {
