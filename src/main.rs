@@ -65,6 +65,9 @@ enum Commands {
     /// Show all fields of a single task
     #[command(visible_alias = "s")]
     Show(commands::show::ShowCommand),
+    /// Show board activity statistics
+    #[command(visible_alias = "st")]
+    Stat(commands::stat::StatCommand),
     /// Edit fields of a task (except history)
     #[command(visible_alias = "e")]
     Edit(commands::edit::EditCommand),
@@ -126,6 +129,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Inprogress(cmd) => cmd.run()?,
         Commands::Done(cmd) => cmd.run()?,
         Commands::Show(cmd) => cmd.run()?,
+        Commands::Stat(cmd) => cmd.run()?,
         Commands::Edit(cmd) => cmd.run()?,
         Commands::Init(cmd) => cmd.run()?,
         Commands::Tui(cmd) => cmd.run()?,

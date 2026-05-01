@@ -6,5 +6,6 @@ pub mod inprogress;
 pub mod list;
 pub mod remove;
 pub mod show;
+pub mod stat;
 pub mod todo;
 pub mod tui;

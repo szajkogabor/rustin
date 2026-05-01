@@ -378,6 +378,77 @@ fn show_status_label_inprogress_is_human_readable() {
         .stdout(predicate::str::contains("Status:      In Progress"));
 }
 
+// ---------------------------------------------------------------------------
+// stat
+// ---------------------------------------------------------------------------
+
+#[test]
+fn stat_summarizes_completed_inprogress_time() {
+    let dir = TempDir::new().unwrap();
+    fs::write(
+        dir.path().join(".rustin.json"),
+        r#"{
+    "version": "0.0.0",
+    "title": "StatsBoard",
+    "next_id": 3,
+    "tasks": [
+        {
+            "id": 1,
+            "title": "Write release notes",
+            "priority": "medium",
+            "kind": "feature",
+            "description": null,
+            "status": "done",
+            "created_at": "2024-01-01T09:00:00Z",
+            "transitions": [
+                { "from": "todo", "to": "in-progress", "at": "2024-01-01T10:00:00Z" },
+                { "from": "in-progress", "to": "done", "at": "2024-01-01T11:30:00Z" }
+            ]
+        },
+        {
+            "id": 2,
+            "title": "Clean up warnings",
+            "priority": "medium",
+            "kind": "feature",
+            "description": null,
+            "status": "done",
+            "created_at": "2024-01-01T09:00:00Z",
+            "transitions": [
+                { "from": "todo", "to": "in-progress", "at": "2024-01-01T12:00:00Z" },
+                { "from": "in-progress", "to": "done", "at": "2024-01-01T12:45:00Z" }
+            ]
+        }
+    ]
+}"#,
+    )
+    .unwrap();
+
+    cmd(&dir)
+        .args(["stat"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("=== StatsBoard stats ==="))
+        .stdout(predicate::str::contains("Tasks:           2"))
+        .stdout(predicate::str::contains("Completed runs:  2"))
+        .stdout(predicate::str::contains("Total active:    2h 15m 00s"))
+        .stdout(predicate::str::contains("[1] Write release notes"))
+        .stdout(predicate::str::contains("1h 30m 00s"))
+        .stdout(predicate::str::contains("[2] Clean up warnings"))
+        .stdout(predicate::str::contains("45m 00s"));
+}
+
+#[test]
+fn alias_st_runs_stat_command() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Task"]).assert().success();
+
+    cmd(&dir)
+        .args(["st"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Per task:"));
+}
+
 #[test]
 fn show_nonexistent_task_exits_nonzero() {
     let dir = TempDir::new().unwrap();

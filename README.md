@@ -33,6 +33,7 @@ Rustin supports the following commands:
 - `inprogress` - Move a task to the `in-progress` column
 - `done` - Move a task to the `done` column
 - `init` - Initialize a new board or set its title
+- `stat` - Show task activity statistics and time summaries
 - `help` - Print command help
 
 ## Options
@@ -54,6 +55,9 @@ rustin add "Review pull request"
 
 # 3) Show current board
 rustin list
+
+# 3b) Show activity stats
+rustin stat
 
 # 4) Move tasks between columns
 rustin inprogress 1
