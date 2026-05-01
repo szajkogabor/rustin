@@ -1,5 +1,6 @@
-use crate::store::{Board, TaskStatus};
+use crate::store::{Board, Task, TaskStatus};
 use clap::Args;
+use std::cmp::Ordering;
 use tabled::{Table, Tabled, settings::Style};
 
 #[derive(Args)]
@@ -19,21 +20,25 @@ impl ListCommand {
     pub fn run(&self) -> anyhow::Result<()> {
         let board = Board::load()?;
 
-        let todos: Vec<_> = board
+        let mut todos: Vec<_> = board
             .tasks
             .iter()
             .filter(|t| t.status == TaskStatus::Todo)
             .collect();
-        let in_progress: Vec<_> = board
+        let mut in_progress: Vec<_> = board
             .tasks
             .iter()
             .filter(|t| t.status == TaskStatus::InProgress)
             .collect();
-        let done: Vec<_> = board
+        let mut done: Vec<_> = board
             .tasks
             .iter()
             .filter(|t| t.status == TaskStatus::Done)
             .collect();
+
+        todos.sort_by(task_order);
+        in_progress.sort_by(task_order);
+        done.sort_by(task_order);
 
         let max_len = todos.len().max(in_progress.len()).max(done.len());
 
@@ -67,4 +72,12 @@ impl ListCommand {
 
         Ok(())
     }
+}
+
+fn task_order(left: &&Task, right: &&Task) -> Ordering {
+    right
+        .priority
+        .cmp(&left.priority)
+        .then_with(|| left.created_at.cmp(&right.created_at))
+        .then_with(|| left.id.cmp(&right.id))
 }

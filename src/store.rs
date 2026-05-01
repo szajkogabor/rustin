@@ -6,8 +6,22 @@ use std::path::PathBuf;
 pub struct Task {
     pub id: u32,
     pub title: String,
+    #[serde(default = "default_task_priority")]
+    pub priority: TaskPriority,
     pub status: TaskStatus,
     pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum TaskPriority {
+    Low,
+    Medium,
+    High,
+}
+
+fn default_task_priority() -> TaskPriority {
+    TaskPriority::Medium
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
