@@ -26,7 +26,9 @@ fn default_board_title() -> String {
 }
 
 fn current_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    option_env!("VERGEN_GIT_DESCRIBE")
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string()
 }
 
 fn default_board_version() -> String {
@@ -123,7 +125,7 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use super::Board;
+    use super::{Board, current_version};
 
     #[test]
     fn default_board_is_initialized_consistently() {
@@ -132,6 +134,6 @@ mod tests {
         assert_eq!(board.next_id, 1);
         assert!(board.tasks.is_empty());
         assert!(!board.title.trim().is_empty());
-        assert_eq!(board.version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(board.version, current_version());
     }
 }
