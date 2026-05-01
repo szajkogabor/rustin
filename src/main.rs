@@ -45,16 +45,22 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Add a new task
+    #[command(visible_alias = "a")]
     Add(commands::add::AddCommand),
     /// Remove an existing task
+    #[command(visible_alias = "r")]
     Remove(commands::remove::RemoveCommand),
     /// List all tasks
+    #[command(visible_alias = "l")]
     List(commands::list::ListCommand),
     /// Move a task to the 'todo' column
+    #[command(visible_alias = "t")]
     Todo(commands::todo::TodoCommand),
     /// Move a task to the 'in-progress' column
+    #[command(visible_alias = "ip")]
     Inprogress(commands::inprogress::InprogressCommand),
     /// Move a task to the 'done' column
+    #[command(visible_alias = "d")]
     Done(commands::done::DoneCommand),
     /// Initialize a new board or set its title
     Init(commands::init::InitCommand),
