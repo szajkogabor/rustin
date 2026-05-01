@@ -62,6 +62,9 @@ enum Commands {
     /// Move a task to the 'done' column
     #[command(visible_alias = "d")]
     Done(commands::done::DoneCommand),
+    /// Show all fields of a single task
+    #[command(visible_alias = "s")]
+    Show(commands::show::ShowCommand),
     /// Initialize a new board or set its title
     Init(commands::init::InitCommand),
 }
@@ -114,6 +117,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Todo(cmd) => cmd.run()?,
         Commands::Inprogress(cmd) => cmd.run()?,
         Commands::Done(cmd) => cmd.run()?,
+        Commands::Show(cmd) => cmd.run()?,
         Commands::Init(cmd) => cmd.run()?,
     }
 
