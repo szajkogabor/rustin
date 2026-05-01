@@ -33,11 +33,11 @@ impl ListCommand {
             .iter()
             .map(|t| {
                 format!(
-                    "{} {} [{}] {}",
+                    "{} [{}] {} {}",
                     priority_emoji(t.priority),
-                    kind_emoji(t.kind),
                     t.id,
-                    t.title
+                    t.title,
+                    kind_emoji(t.kind)
                 )
             })
             .collect();
@@ -45,11 +45,11 @@ impl ListCommand {
             .iter()
             .map(|t| {
                 format!(
-                    "{} {} [{}] {}",
+                    "{} [{}] {} {}",
                     priority_emoji(t.priority),
-                    kind_emoji(t.kind),
                     t.id,
-                    t.title
+                    t.title,
+                    kind_emoji(t.kind)
                 )
             })
             .collect();
@@ -57,11 +57,11 @@ impl ListCommand {
             .iter()
             .map(|t| {
                 format!(
-                    "{} {} [{}] {}",
+                    "{} [{}] {} {}",
                     priority_emoji(t.priority),
-                    kind_emoji(t.kind),
                     t.id,
-                    t.title
+                    t.title,
+                    kind_emoji(t.kind)
                 )
             })
             .collect();
