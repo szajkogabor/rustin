@@ -8,6 +8,8 @@ pub struct Task {
     pub title: String,
     #[serde(default = "default_task_priority")]
     pub priority: TaskPriority,
+    #[serde(default)]
+    pub kind: TaskKind,
     pub status: TaskStatus,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -24,6 +26,15 @@ pub enum TaskPriority {
 
 fn default_task_priority() -> TaskPriority {
     TaskPriority::Medium
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum TaskKind {
+    #[default]
+    Feature,
+    Bug,
+    Chore,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

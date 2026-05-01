@@ -8,6 +8,10 @@ pub struct AddCommand {
     /// Task priority
     #[arg(short, long, value_enum, default_value_t = crate::store::TaskPriority::Medium)]
     pub priority: crate::store::TaskPriority,
+
+    /// Task kind
+    #[arg(short, long, value_enum, default_value_t = crate::store::TaskKind::Feature)]
+    pub kind: crate::store::TaskKind,
 }
 
 use crate::store::{Board, Task, TaskStatus};
@@ -21,6 +25,7 @@ impl AddCommand {
             id: board.next_id,
             title: self.title.clone(),
             priority: self.priority,
+            kind: self.kind,
             status: TaskStatus::Todo,
             created_at: Utc::now(),
         };

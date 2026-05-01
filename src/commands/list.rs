@@ -1,4 +1,4 @@
-use crate::store::{Board, Task, TaskPriority, TaskStatus};
+use crate::store::{Board, Task, TaskKind, TaskPriority, TaskStatus};
 use clap::Args;
 use std::cmp::Ordering;
 
@@ -31,15 +31,39 @@ impl ListCommand {
 
         let todos: Vec<String> = todos
             .iter()
-            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .map(|t| {
+                format!(
+                    "{} {} [{}] {}",
+                    priority_emoji(t.priority),
+                    kind_emoji(t.kind),
+                    t.id,
+                    t.title
+                )
+            })
             .collect();
         let in_progress: Vec<String> = in_progress
             .iter()
-            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .map(|t| {
+                format!(
+                    "{} {} [{}] {}",
+                    priority_emoji(t.priority),
+                    kind_emoji(t.kind),
+                    t.id,
+                    t.title
+                )
+            })
             .collect();
         let done: Vec<String> = done
             .iter()
-            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .map(|t| {
+                format!(
+                    "{} {} [{}] {}",
+                    priority_emoji(t.priority),
+                    kind_emoji(t.kind),
+                    t.id,
+                    t.title
+                )
+            })
             .collect();
 
         let max_len = todos.len().max(in_progress.len()).max(done.len());
@@ -114,10 +138,18 @@ fn priority_emoji(priority: TaskPriority) -> &'static str {
     }
 }
 
+fn kind_emoji(kind: TaskKind) -> &'static str {
+    match kind {
+        TaskKind::Feature => "✨",
+        TaskKind::Bug => "🐛",
+        TaskKind::Chore => "🔧",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{priority_emoji, task_order};
-    use crate::store::{Task, TaskPriority, TaskStatus};
+    use super::{kind_emoji, priority_emoji, task_order};
+    use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, Utc};
 
     fn make_task(id: u32, priority: TaskPriority, created_at: chrono::DateTime<Utc>) -> Task {
@@ -125,6 +157,7 @@ mod tests {
             id,
             title: format!("task-{id}"),
             priority,
+            kind: TaskKind::Feature,
             status: TaskStatus::Todo,
             created_at,
         }
@@ -151,5 +184,12 @@ mod tests {
         assert_eq!(priority_emoji(TaskPriority::High), "🔥");
         assert_eq!(priority_emoji(TaskPriority::Medium), "🌶️");
         assert_eq!(priority_emoji(TaskPriority::Low), "🧊");
+    }
+
+    #[test]
+    fn kind_emoji_maps_all_kinds() {
+        assert_eq!(kind_emoji(TaskKind::Feature), "✨");
+        assert_eq!(kind_emoji(TaskKind::Bug), "🐛");
+        assert_eq!(kind_emoji(TaskKind::Chore), "🔧");
     }
 }
