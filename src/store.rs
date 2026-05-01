@@ -163,15 +163,69 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use super::{Board, current_version};
+    use super::{Board, TaskKind, TaskPriority, TaskStatus, current_version};
 
     #[test]
     fn default_board_is_initialized_consistently() {
         let board = Board::default();
-
         assert_eq!(board.next_id, 1);
         assert!(board.tasks.is_empty());
         assert!(!board.title.trim().is_empty());
         assert_eq!(board.version, current_version());
+    }
+
+    #[test]
+    fn task_priority_ordering_high_greater_than_medium_greater_than_low() {
+        assert!(TaskPriority::High > TaskPriority::Medium);
+        assert!(TaskPriority::Medium > TaskPriority::Low);
+        assert!(TaskPriority::High > TaskPriority::Low);
+    }
+
+    #[test]
+    fn task_kind_default_is_feature() {
+        let kind = TaskKind::default();
+        assert_eq!(kind, TaskKind::Feature);
+    }
+
+    #[test]
+    fn task_status_equality() {
+        assert_eq!(TaskStatus::Todo, TaskStatus::Todo);
+        assert_ne!(TaskStatus::Todo, TaskStatus::Done);
+        assert_ne!(TaskStatus::InProgress, TaskStatus::Done);
+    }
+
+    #[test]
+    fn task_deserializes_missing_priority_as_medium() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, TaskPriority::Medium);
+    }
+
+    #[test]
+    fn task_deserializes_missing_kind_as_feature() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.kind, TaskKind::Feature);
+    }
+
+    #[test]
+    fn task_deserializes_missing_description_as_none() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert!(task.description.is_none());
+    }
+
+    #[test]
+    fn task_deserializes_missing_transitions_as_empty() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert!(task.transitions.is_empty());
+    }
+
+    #[test]
+    fn board_deserializes_missing_version_with_default() {
+        let json = r#"{"title":"MyBoard","next_id":1,"tasks":[]}"#;
+        let board: Board = serde_json::from_str(json).unwrap();
+        assert_eq!(board.version, "0.0.0");
     }
 }

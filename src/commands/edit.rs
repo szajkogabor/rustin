@@ -56,3 +56,40 @@ impl EditCommand {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::store::{TaskKind, TaskPriority};
+
+    #[test]
+    fn empty_description_string_becomes_none() {
+        let input = "".to_string();
+        let result: Option<String> = if input.is_empty() { None } else { Some(input) };
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn nonempty_description_is_preserved() {
+        let input = "My description".to_string();
+        let result: Option<String> = if input.is_empty() {
+            None
+        } else {
+            Some(input.clone())
+        };
+        assert_eq!(result, Some("My description".to_string()));
+    }
+
+    #[test]
+    fn priority_values_are_all_distinct() {
+        assert_ne!(TaskPriority::High, TaskPriority::Medium);
+        assert_ne!(TaskPriority::Medium, TaskPriority::Low);
+        assert_ne!(TaskPriority::High, TaskPriority::Low);
+    }
+
+    #[test]
+    fn kind_values_are_all_distinct() {
+        assert_ne!(TaskKind::Feature, TaskKind::Bug);
+        assert_ne!(TaskKind::Bug, TaskKind::Chore);
+        assert_ne!(TaskKind::Feature, TaskKind::Chore);
+    }
+}

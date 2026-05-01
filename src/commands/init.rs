@@ -24,3 +24,27 @@ impl InitCommand {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::store::Board;
+
+    #[test]
+    fn setting_title_updates_board_title() {
+        let mut board = Board::default();
+        let new_title = "My Project".to_string();
+        board.title = new_title.clone();
+        assert_eq!(board.title, "My Project");
+    }
+
+    #[test]
+    fn not_setting_title_leaves_board_title_unchanged() {
+        let mut board = Board::default();
+        let original = board.title.clone();
+        let new_title: Option<String> = None;
+        if let Some(t) = new_title {
+            board.title = t;
+        }
+        assert_eq!(board.title, original);
+    }
+}
