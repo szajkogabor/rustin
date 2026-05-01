@@ -1,20 +1,9 @@
 use crate::store::{Board, Task, TaskPriority, TaskStatus};
 use clap::Args;
 use std::cmp::Ordering;
-use tabled::{Table, Tabled, settings::Style};
 
 #[derive(Args)]
 pub struct ListCommand {}
-
-#[derive(Tabled)]
-struct BoardRow {
-    #[tabled(rename = "Todo")]
-    todo: String,
-    #[tabled(rename = "In Progress")]
-    in_progress: String,
-    #[tabled(rename = "Done")]
-    done: String,
-}
 
 impl ListCommand {
     pub fn run(&self) -> anyhow::Result<()> {
@@ -40,37 +29,72 @@ impl ListCommand {
         in_progress.sort_by(task_order);
         done.sort_by(task_order);
 
-        let max_len = todos.len().max(in_progress.len()).max(done.len());
+        let todos: Vec<String> = todos
+            .iter()
+            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .collect();
+        let in_progress: Vec<String> = in_progress
+            .iter()
+            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .collect();
+        let done: Vec<String> = done
+            .iter()
+            .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
+            .collect();
 
-        let mut rows = Vec::new();
-        for i in 0..max_len {
-            rows.push(BoardRow {
-                todo: todos
-                    .get(i)
-                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
-                    .unwrap_or_default(),
-                in_progress: in_progress
-                    .get(i)
-                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
-                    .unwrap_or_default(),
-                done: done
-                    .get(i)
-                    .map(|t| format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title))
-                    .unwrap_or_default(),
-            });
-        }
+        let max_len = todos.len().max(in_progress.len()).max(done.len());
 
         println!("=== {} ===", board.title);
 
-        if rows.is_empty() {
+        if max_len == 0 {
             println!("The board is empty. Add a task with `rustin add \"Task title\"`");
         } else {
-            let mut table = Table::new(rows);
-            table.with(Style::modern());
-            println!("{}", table);
+            print_columns(&todos, &in_progress, &done);
         }
 
         Ok(())
+    }
+}
+
+fn print_columns(todo: &[String], in_progress: &[String], done: &[String]) {
+    let todo_header = "Todo";
+    let in_progress_header = "In Progress";
+    let done_header = "Done";
+
+    let todo_width = todo
+        .iter()
+        .map(|v| v.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(todo_header.len());
+    let in_progress_width = in_progress
+        .iter()
+        .map(|v| v.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(in_progress_header.len());
+    let done_width = done
+        .iter()
+        .map(|v| v.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(done_header.len());
+
+    println!(
+        "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
+        todo_header, in_progress_header, done_header
+    );
+
+    let max_len = todo.len().max(in_progress.len()).max(done.len());
+    for i in 0..max_len {
+        let todo_value = todo.get(i).map_or("", String::as_str);
+        let in_progress_value = in_progress.get(i).map_or("", String::as_str);
+        let done_value = done.get(i).map_or("", String::as_str);
+
+        println!(
+            "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
+            todo_value, in_progress_value, done_value
+        );
     }
 }
 
