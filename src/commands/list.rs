@@ -85,24 +85,34 @@ fn print_columns(todo: &[String], in_progress: &[String], done: &[String]) {
     let in_progress_header = "In Progress";
     let done_header = "Done";
 
-    let todo_width = todo
+    let todo_content_width = todo
         .iter()
         .map(|v| v.chars().count())
         .max()
         .unwrap_or(0)
         .max(todo_header.len());
-    let in_progress_width = in_progress
+    let in_progress_content_width = in_progress
         .iter()
         .map(|v| v.chars().count())
         .max()
         .unwrap_or(0)
         .max(in_progress_header.len());
-    let done_width = done
+    let done_content_width = done
         .iter()
         .map(|v| v.chars().count())
         .max()
         .unwrap_or(0)
         .max(done_header.len());
+
+    // Fit within terminal width: 3 columns + 2 separators " | " (3 chars each)
+    let terminal_width = terminal_width();
+    let separators = 6; // " | " twice
+    let available = terminal_width.saturating_sub(separators);
+    let col_cap = (available / 3).max(10);
+
+    let todo_width = todo_content_width.min(col_cap);
+    let in_progress_width = in_progress_content_width.min(col_cap);
+    let done_width = done_content_width.min(col_cap);
 
     println!(
         "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
@@ -111,14 +121,38 @@ fn print_columns(todo: &[String], in_progress: &[String], done: &[String]) {
 
     let max_len = todo.len().max(in_progress.len()).max(done.len());
     for i in 0..max_len {
-        let todo_value = todo.get(i).map_or("", String::as_str);
-        let in_progress_value = in_progress.get(i).map_or("", String::as_str);
-        let done_value = done.get(i).map_or("", String::as_str);
+        let todo_value = truncate(todo.get(i).map_or("", String::as_str), todo_width);
+        let in_progress_value = truncate(
+            in_progress.get(i).map_or("", String::as_str),
+            in_progress_width,
+        );
+        let done_value = truncate(done.get(i).map_or("", String::as_str), done_width);
 
         println!(
             "{:todo_width$} | {:in_progress_width$} | {:done_width$}",
             todo_value, in_progress_value, done_value
         );
+    }
+}
+
+fn terminal_width() -> usize {
+    // COLUMNS env var is set by most shells; fall back to a safe default
+    if let Ok(val) = std::env::var("COLUMNS")
+        && let Ok(n) = val.parse::<usize>()
+    {
+        return n;
+    }
+    120
+}
+
+/// Truncate `s` to at most `max` visible chars, appending `…` if cut.
+fn truncate(s: &str, max: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max {
+        s.to_string()
+    } else {
+        let cut = max.saturating_sub(1);
+        chars[..cut].iter().collect::<String>() + "…"
     }
 }
 
