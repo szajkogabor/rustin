@@ -1,5 +1,6 @@
 pub mod add;
 pub mod done;
+pub mod edit;
 pub mod init;
 pub mod inprogress;
 pub mod list;
