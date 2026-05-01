@@ -267,6 +267,23 @@ fn list_columns_multiple_shows_selected_only() {
         .stdout(predicate::str::contains("In Progress").not());
 }
 
+#[test]
+fn list_narrow_terminal_truncates_header_to_column_width() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Todo task"]).assert().success();
+    cmd(&dir).args(["add", "Progress task"]).assert().success();
+    cmd(&dir).args(["inprogress", "2"]).assert().success();
+    cmd(&dir).args(["add", "Done task"]).assert().success();
+    cmd(&dir).args(["done", "3"]).assert().success();
+
+    cmd(&dir)
+        .env("COLUMNS", "24")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("In Progre…"));
+}
+
 // ---------------------------------------------------------------------------
 // show
 // ---------------------------------------------------------------------------

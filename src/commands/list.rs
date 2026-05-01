@@ -117,7 +117,7 @@ fn print_columns(
     let header_parts: Vec<String> = cols
         .iter()
         .zip(widths.iter())
-        .map(|((header, _), w)| format!("{:w$}", header))
+        .map(|((header, _), w)| format!("{:w$}", truncate(header, *w)))
         .collect();
     println!("{}", header_parts.join(" | "));
 
