@@ -3,6 +3,13 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StatusTransition {
+    pub from: TaskStatus,
+    pub to: TaskStatus,
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
     pub id: u32,
     pub title: String,
@@ -14,6 +21,8 @@ pub struct Task {
     pub description: Option<String>,
     pub status: TaskStatus,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    pub transitions: Vec<StatusTransition>,
 }
 
 #[derive(

@@ -29,6 +29,17 @@ impl ShowCommand {
         if let Some(desc) = &task.description {
             println!("Description: {}", desc);
         }
+        if !task.transitions.is_empty() {
+            println!("History:");
+            for t in &task.transitions {
+                println!(
+                    "  {:?} → {:?}  ({})",
+                    t.from,
+                    t.to,
+                    t.at.format("%Y-%m-%d %H:%M:%S UTC")
+                );
+            }
+        }
 
         Ok(())
     }

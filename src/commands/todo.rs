@@ -1,4 +1,5 @@
-use crate::store::{Board, TaskStatus};
+use crate::store::{Board, StatusTransition, TaskStatus};
+use chrono::Utc;
 use clap::Args;
 
 #[derive(Args)]
@@ -12,6 +13,12 @@ impl TodoCommand {
         let mut board = Board::load()?;
 
         if let Some(task) = board.tasks.iter_mut().find(|t| t.id == self.id) {
+            let from = task.status.clone();
+            task.transitions.push(StatusTransition {
+                from,
+                to: TaskStatus::Todo,
+                at: Utc::now(),
+            });
             task.status = TaskStatus::Todo;
             board.save()?;
             tracing::info!("Task {} moved to Todo", self.id);

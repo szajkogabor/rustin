@@ -161,6 +161,7 @@ mod tests {
             description: None,
             status: TaskStatus::Todo,
             created_at,
+            transitions: vec![],
         }
     }
 

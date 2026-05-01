@@ -33,6 +33,7 @@ impl AddCommand {
             description: self.description.clone(),
             status: TaskStatus::Todo,
             created_at: Utc::now(),
+            transitions: vec![],
         };
 
         board.next_id += 1;
