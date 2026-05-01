@@ -40,18 +40,45 @@ impl StatCommand {
         }
 
         println!("Per task:");
+        let max_active_time = stats
+            .iter()
+            .map(|stat| stat.total_active_time)
+            .max()
+            .unwrap_or_else(Duration::zero);
+
         for stat in &stats {
             println!(
-                "[{}] {:<24} {:>10}  runs:{}",
+                "[{}] {:<24} {:>10}  runs:{}  {}",
                 stat.id,
                 truncate(&stat.title, 24),
                 format_duration(stat.total_active_time),
                 stat.completed_cycles,
+                horizontal_bar(stat.total_active_time, max_active_time, 16),
             );
         }
 
         Ok(())
     }
+}
+
+fn horizontal_bar(duration: Duration, max_duration: Duration, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+
+    let duration_seconds = duration.num_seconds().max(0);
+    let max_seconds = max_duration.num_seconds().max(0);
+
+    let filled = if duration_seconds == 0 || max_seconds == 0 {
+        0
+    } else {
+        ((duration_seconds as f64 / max_seconds as f64) * width as f64)
+            .round()
+            .clamp(1.0, width as f64) as usize
+    };
+    let empty = width.saturating_sub(filled);
+
+    format!("|{}{}|", "█".repeat(filled), "░".repeat(empty))
 }
 
 fn task_stat(task: &Task) -> TaskStat {
@@ -109,7 +136,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TaskStat, format_duration, task_stat};
+    use super::{TaskStat, format_duration, horizontal_bar, task_stat};
     use crate::store::{StatusTransition, Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, TimeZone, Utc};
 
@@ -199,5 +226,22 @@ mod tests {
         }];
 
         assert_eq!(stats[0].completed_cycles, 2);
+    }
+
+    #[test]
+    fn horizontal_bar_uses_relative_fill() {
+        let max = Duration::minutes(10);
+
+        assert_eq!(horizontal_bar(Duration::zero(), max, 8), "|░░░░░░░░|");
+        assert_eq!(horizontal_bar(Duration::minutes(5), max, 8), "|████░░░░|");
+        assert_eq!(horizontal_bar(Duration::minutes(10), max, 8), "|████████|");
+    }
+
+    #[test]
+    fn horizontal_bar_handles_zero_max_duration() {
+        assert_eq!(
+            horizontal_bar(Duration::minutes(5), Duration::zero(), 8),
+            "|░░░░░░░░|"
+        );
     }
 }

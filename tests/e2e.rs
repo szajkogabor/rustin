@@ -60,6 +60,39 @@ fn init_from_nested_directory_uses_project_root_for_title_and_file() {
     );
 }
 
+#[test]
+fn init_in_git_repo_can_add_board_file_to_gitignore() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir(dir.path().join(".git")).unwrap();
+
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(dir.path());
+    command.write_stdin("y\n");
+    command
+        .args(["init"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Add .rustin.json to .gitignore? [y/N]:",
+        ));
+
+    let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(gitignore.contains(".rustin.json"));
+}
+
+#[test]
+fn init_in_git_repo_can_skip_gitignore_update() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir(dir.path().join(".git")).unwrap();
+
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(dir.path());
+    command.write_stdin("n\n");
+    command.args(["init"]).assert().success();
+
+    assert!(!dir.path().join(".gitignore").exists());
+}
+
 // ---------------------------------------------------------------------------
 // list (empty board)
 // ---------------------------------------------------------------------------
@@ -435,7 +468,9 @@ fn stat_summarizes_completed_inprogress_time() {
         .stdout(predicate::str::contains("1h 30m 00s"))
         .stdout(predicate::str::contains("[2] Clean up warnings"))
         .stdout(predicate::str::contains("45m 00s"))
-        .stdout(predicate::str::contains("runs:1"));
+        .stdout(predicate::str::contains("runs:1"))
+        .stdout(predicate::str::contains("|████████████████|"))
+        .stdout(predicate::str::contains("|████████░░░░░░░░|"));
 }
 
 #[test]
