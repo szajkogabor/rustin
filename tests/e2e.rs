@@ -128,6 +128,19 @@ fn list_empty_board_shows_message() {
 }
 
 #[test]
+fn list_with_malformed_board_shows_actionable_parse_error() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join(".rustin.json"), "{not-json").unwrap();
+
+    cmd(&dir)
+        .args(["list"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Failed to parse board file at"))
+        .stderr(predicate::str::contains("rustin init"));
+}
+
+#[test]
 fn no_args_shows_board() {
     let dir = TempDir::new().unwrap();
     cmd(&dir)
@@ -305,6 +318,49 @@ fn done_task_not_in_todo_column() {
         .stdout(predicate::str::contains("Done task").not());
 }
 
+#[test]
+fn inprogress_nonexistent_task_keeps_existing_tasks_unchanged() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Still todo"]).assert().success();
+
+    cmd(&dir).args(["inprogress", "999"]).assert().success();
+
+    cmd(&dir)
+        .args(["list", "-c", "todo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Still todo"));
+}
+
+#[test]
+fn todo_nonexistent_task_keeps_existing_tasks_unchanged() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Still done"]).assert().success();
+    cmd(&dir).args(["done", "1"]).assert().success();
+
+    cmd(&dir).args(["todo", "999"]).assert().success();
+
+    cmd(&dir)
+        .args(["list", "-c", "done"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Still done"));
+}
+
+#[test]
+fn done_nonexistent_task_keeps_existing_tasks_unchanged() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Still todo"]).assert().success();
+
+    cmd(&dir).args(["done", "999"]).assert().success();
+
+    cmd(&dir)
+        .args(["list", "-c", "todo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Still todo"));
+}
+
 // ---------------------------------------------------------------------------
 // list --columns / -c filter
 // ---------------------------------------------------------------------------
@@ -366,6 +422,95 @@ fn list_narrow_terminal_truncates_header_to_column_width() {
         .assert()
         .success()
         .stdout(predicate::str::contains("In Progre…"));
+}
+
+#[test]
+fn list_from_nested_directory_uses_parent_board_file() {
+    let dir = TempDir::new().unwrap();
+    let nested = dir.path().join("nested").join("deep");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(
+        dir.path().join(".rustin.json"),
+        r#"{
+    "version": "0.0.0",
+    "title": "ParentBoard",
+    "next_id": 2,
+    "tasks": [
+        {
+            "id": 1,
+            "title": "From parent",
+            "priority": "medium",
+            "kind": "feature",
+            "description": null,
+            "status": "todo",
+            "created_at": "2024-01-01T00:00:00Z",
+            "transitions": []
+        }
+    ]
+}"#,
+    )
+    .unwrap();
+
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(&nested);
+    command
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("=== ParentBoard ==="))
+        .stdout(predicate::str::contains("From parent"));
+}
+
+#[test]
+fn list_sorts_equal_priority_and_timestamp_by_id() {
+    let dir = TempDir::new().unwrap();
+    fs::write(
+        dir.path().join(".rustin.json"),
+        r#"{
+    "version": "0.0.0",
+    "title": "SortBoard",
+    "next_id": 3,
+    "tasks": [
+        {
+            "id": 2,
+            "title": "Second",
+            "priority": "medium",
+            "kind": "feature",
+            "description": null,
+            "status": "todo",
+            "created_at": "2024-01-01T00:00:00Z",
+            "transitions": []
+        },
+        {
+            "id": 1,
+            "title": "First",
+            "priority": "medium",
+            "kind": "feature",
+            "description": null,
+            "status": "todo",
+            "created_at": "2024-01-01T00:00:00Z",
+            "transitions": []
+        }
+    ]
+}"#,
+    )
+    .unwrap();
+
+    let output = cmd(&dir)
+        .args(["list", "-c", "todo"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    let first = text
+        .find("[1] First")
+        .expect("expected first task in output");
+    let second = text
+        .find("[2] Second")
+        .expect("expected second task in output");
+    assert!(first < second, "expected id 1 before id 2, got:\n{text}");
 }
 
 // ---------------------------------------------------------------------------
