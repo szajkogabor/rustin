@@ -1,19 +1,11 @@
-use crate::commands::list::{kind_emoji, priority_emoji};
-use crate::store::{Board, Task, TaskStatus};
+use crate::commands::display::{kind_emoji, priority_emoji, status_label};
+use crate::store::{Board, Task};
 use clap::Args;
 
 #[derive(Args)]
 pub struct ShowCommand {
     /// ID of the task to show
     pub id: u32,
-}
-
-pub(crate) fn status_label(status: &TaskStatus) -> &'static str {
-    match status {
-        TaskStatus::Todo => "Todo",
-        TaskStatus::InProgress => "In Progress",
-        TaskStatus::Done => "Done",
-    }
 }
 
 pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
@@ -71,7 +63,8 @@ impl ShowCommand {
 
 #[cfg(test)]
 mod tests {
-    use super::{status_label, task_detail_lines};
+    use super::task_detail_lines;
+    use crate::commands::display::status_label;
     use crate::store::{StatusTransition, Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{TimeZone, Utc};
 

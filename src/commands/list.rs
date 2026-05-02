@@ -1,4 +1,5 @@
-use crate::store::{Board, Task, TaskKind, TaskPriority, TaskStatus};
+use crate::commands::display::{kind_emoji, priority_emoji};
+use crate::store::{Board, Task, TaskStatus};
 use clap::{Args, ValueEnum};
 use std::cmp::Ordering;
 
@@ -184,25 +185,10 @@ pub(crate) fn task_order(left: &&Task, right: &&Task) -> Ordering {
         .then_with(|| left.id.cmp(&right.id))
 }
 
-pub(crate) fn priority_emoji(priority: TaskPriority) -> &'static str {
-    match priority {
-        TaskPriority::High => "🔥",
-        TaskPriority::Medium => "🌶️",
-        TaskPriority::Low => "🧊",
-    }
-}
-
-pub(crate) fn kind_emoji(kind: TaskKind) -> &'static str {
-    match kind {
-        TaskKind::Feature => "✨",
-        TaskKind::Bug => "🐛",
-        TaskKind::Chore => "🔧",
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{format_task, kind_emoji, priority_emoji, task_order, truncate};
+    use super::{format_task, task_order, truncate};
+    use crate::commands::display::{kind_emoji, priority_emoji};
     use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, Utc};
 

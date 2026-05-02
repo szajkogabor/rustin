@@ -1,4 +1,5 @@
-use crate::commands::list::{kind_emoji, priority_emoji, task_order};
+use crate::commands::display::{kind_emoji, priority_emoji, status_label};
+use crate::commands::list::task_order;
 use crate::commands::show::task_detail_lines;
 use crate::store::{Board, Task, TaskStatus};
 use anyhow::Context;
@@ -528,14 +529,6 @@ fn split_tasks(tasks: &[Task]) -> TaskColumns {
     }
 
     columns
-}
-
-fn status_label(status: &TaskStatus) -> &'static str {
-    match status {
-        TaskStatus::Todo => "Todo",
-        TaskStatus::InProgress => "In Progress",
-        TaskStatus::Done => "Done",
-    }
 }
 
 #[cfg(test)]
