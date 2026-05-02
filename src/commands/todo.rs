@@ -1,4 +1,4 @@
-use crate::store::{Board, TaskStatus};
+use crate::store::TaskStatus;
 use clap::Args;
 
 #[derive(Args)]
@@ -9,17 +9,7 @@ pub struct TodoCommand {
 
 impl TodoCommand {
     pub fn run(&self) -> anyhow::Result<()> {
-        let mut board = Board::load()?;
-
-        if board.move_task(self.id, TaskStatus::Todo) {
-            board.save()?;
-            tracing::info!("Task {} moved to Todo", self.id);
-        } else {
-            tracing::warn!("Task {} not found", self.id);
-        }
-
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
-        Ok(())
+        crate::commands::move_task_and_list(self.id, TaskStatus::Todo, "Todo")
     }
 }
 
