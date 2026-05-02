@@ -216,7 +216,7 @@ fn save_atomically(path: &Path, content: &str) -> anyhow::Result<()> {
 
     fs::rename(&temp_path, path).with_context(|| {
         format!(
-            "Failed to replace board file at {} with temporary file.",
+            "Failed to replace board file at {} with temporary file. If another process or tool is using the file, close it and retry.",
             path.display()
         )
     })?;

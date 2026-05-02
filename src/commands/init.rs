@@ -63,6 +63,9 @@ fn maybe_offer_gitignore_entry(mode: GitignoreMode) -> anyhow::Result<()> {
 
     if !should_prompt_for_gitignore(io::stdin().is_terminal(), io::stdout().is_terminal()) {
         tracing::debug!("Skipping .gitignore prompt because terminal is non-interactive");
+        println!(
+            "hint: non-interactive terminal detected; run `rustin init --gitignore add` to update .gitignore automatically"
+        );
         return Ok(());
     }
 

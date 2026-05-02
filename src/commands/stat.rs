@@ -275,15 +275,33 @@ mod tests {
     }
 
     #[test]
-    fn task_stat_keeps_completed_cycle_count() {
-        let stats = [TaskStat {
-            id: 1,
-            title: "task".to_string(),
-            total_active_time: Duration::minutes(10),
-            completed_cycles: 2,
-        }];
+    fn task_stat_counts_multiple_completed_cycles() {
+        let task = make_task(vec![
+            StatusTransition {
+                from: TaskStatus::Todo,
+                to: TaskStatus::InProgress,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
+            },
+            StatusTransition {
+                from: TaskStatus::InProgress,
+                to: TaskStatus::Done,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 15, 0).unwrap(),
+            },
+            StatusTransition {
+                from: TaskStatus::Done,
+                to: TaskStatus::InProgress,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 20, 0).unwrap(),
+            },
+            StatusTransition {
+                from: TaskStatus::InProgress,
+                to: TaskStatus::Done,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 35, 0).unwrap(),
+            },
+        ]);
 
-        assert_eq!(stats[0].completed_cycles, 2);
+        let stat = task_stat(&task);
+        assert_eq!(stat.completed_cycles, 2);
+        assert_eq!(stat.total_active_time, Duration::minutes(30));
     }
 
     #[test]

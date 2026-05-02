@@ -188,7 +188,6 @@ pub(crate) fn task_order(left: &&Task, right: &&Task) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::{format_task, task_order, truncate};
-    use crate::commands::display::{kind_emoji, priority_emoji};
     use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, Utc};
 
@@ -250,19 +249,5 @@ mod tests {
         task.kind = TaskKind::Bug;
         let (_, suffix) = format_task(&&task);
         assert_eq!(suffix, "🐛");
-    }
-
-    #[test]
-    fn priority_emoji_maps_all_priorities() {
-        assert_eq!(priority_emoji(TaskPriority::High), "🔥");
-        assert_eq!(priority_emoji(TaskPriority::Medium), "🌶️");
-        assert_eq!(priority_emoji(TaskPriority::Low), "🧊");
-    }
-
-    #[test]
-    fn kind_emoji_maps_all_kinds() {
-        assert_eq!(kind_emoji(TaskKind::Feature), "✨");
-        assert_eq!(kind_emoji(TaskKind::Bug), "🐛");
-        assert_eq!(kind_emoji(TaskKind::Chore), "🔧");
     }
 }

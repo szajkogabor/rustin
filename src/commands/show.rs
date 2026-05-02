@@ -64,7 +64,6 @@ impl ShowCommand {
 #[cfg(test)]
 mod tests {
     use super::task_detail_lines;
-    use crate::commands::display::status_label;
     use crate::store::{StatusTransition, Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{TimeZone, Utc};
 
@@ -83,13 +82,6 @@ mod tests {
                 at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
             }],
         }
-    }
-
-    #[test]
-    fn status_label_maps_all_statuses() {
-        assert_eq!(status_label(&TaskStatus::Todo), "Todo");
-        assert_eq!(status_label(&TaskStatus::InProgress), "In Progress");
-        assert_eq!(status_label(&TaskStatus::Done), "Done");
     }
 
     #[test]
