@@ -1,6 +1,8 @@
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StatusTransition {
@@ -136,8 +138,18 @@ impl Board {
         let path = Self::get_file_path()?;
         if path.exists() {
             tracing::debug!("Loading board from {:?}", path);
-            let content = fs::read_to_string(&path)?;
-            let mut board: Board = serde_json::from_str(&content)?;
+            let content = fs::read_to_string(&path).with_context(|| {
+                format!(
+                    "Failed to read board file at {}. Check that the file is readable.",
+                    path.display()
+                )
+            })?;
+            let mut board: Board = serde_json::from_str(&content).with_context(|| {
+                format!(
+                    "Failed to parse board file at {}. The file is not valid JSON. Fix the file or remove it and run `rustin init`.",
+                    path.display()
+                )
+            })?;
 
             let cv = current_version();
             if board.version != cv {
@@ -160,7 +172,7 @@ impl Board {
         let path = Self::get_file_path()?;
         tracing::debug!("Saving board to {:?}", path);
         let content = serde_json::to_string_pretty(self)?;
-        fs::write(path, content)?;
+        save_atomically(&path, &content)?;
         Ok(())
     }
 
@@ -180,10 +192,63 @@ impl Board {
     }
 }
 
+fn save_atomically(path: &Path, content: &str) -> anyhow::Result<()> {
+    let temp_path = atomic_temp_path(path)?;
+    let mut temp_file = fs::File::create(&temp_path).with_context(|| {
+        format!(
+            "Failed to create temporary board file at {}.",
+            temp_path.display()
+        )
+    })?;
+    temp_file.write_all(content.as_bytes()).with_context(|| {
+        format!(
+            "Failed to write temporary board file at {}.",
+            temp_path.display()
+        )
+    })?;
+    temp_file.sync_all().with_context(|| {
+        format!(
+            "Failed to flush temporary board file at {}.",
+            temp_path.display()
+        )
+    })?;
+    drop(temp_file);
+
+    fs::rename(&temp_path, path).with_context(|| {
+        format!(
+            "Failed to replace board file at {} with temporary file.",
+            path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+fn atomic_temp_path(path: &Path) -> anyhow::Result<PathBuf> {
+    let file_name = path.file_name().with_context(|| {
+        format!(
+            "Failed to determine board file name for atomic save at {}.",
+            path.display()
+        )
+    })?;
+    let temp_name = format!(
+        ".{}.{}.tmp",
+        file_name.to_string_lossy(),
+        std::process::id()
+    );
+    Ok(path.with_file_name(temp_name))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Board, Task, TaskKind, TaskPriority, TaskStatus, current_version};
+    use super::{
+        Board, Task, TaskKind, TaskPriority, TaskStatus, atomic_temp_path, current_version,
+        save_atomically,
+    };
     use chrono::Utc;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
 
     fn make_task(id: u32, status: TaskStatus) -> Task {
         Task {
@@ -290,5 +355,41 @@ mod tests {
         };
 
         assert!(!board.move_task(99, TaskStatus::Done));
+    }
+
+    #[test]
+    fn save_atomically_persists_content_and_removes_temp_file() {
+        let dir = TempDir::new().unwrap();
+        let board_path = dir.path().join(".rustin.json");
+
+        save_atomically(&board_path, "{\"title\":\"Board\"}").unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&board_path).unwrap(),
+            "{\"title\":\"Board\"}"
+        );
+        assert!(!atomic_temp_path(&board_path).unwrap().exists());
+    }
+
+    #[test]
+    fn atomic_temp_path_uses_hidden_sibling_file() {
+        let path = PathBuf::from("/tmp/.rustin.json");
+        let temp_path = atomic_temp_path(&path).unwrap();
+
+        assert_eq!(temp_path.parent(), path.parent());
+        assert!(
+            temp_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("..rustin.json.")
+        );
+        assert!(
+            temp_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .ends_with(".tmp")
+        );
     }
 }
