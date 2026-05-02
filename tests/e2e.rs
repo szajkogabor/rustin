@@ -65,16 +65,10 @@ fn init_in_git_repo_can_add_board_file_to_gitignore() {
     let dir = TempDir::new().unwrap();
     fs::create_dir(dir.path().join(".git")).unwrap();
 
-    let mut command = Command::cargo_bin("rustin").unwrap();
-    command.current_dir(dir.path());
-    command.write_stdin("y\n");
-    command
-        .args(["init"])
+    cmd(&dir)
+        .args(["init", "--gitignore", "add"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "Add .rustin.json to .gitignore? [y/N]:",
-        ));
+        .success();
 
     let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
     assert!(gitignore.contains(".rustin.json"));
@@ -89,6 +83,32 @@ fn init_in_git_repo_can_skip_gitignore_update() {
     command.current_dir(dir.path());
     command.write_stdin("n\n");
     command.args(["init"]).assert().success();
+
+    assert!(!dir.path().join(".gitignore").exists());
+}
+
+#[test]
+fn init_in_git_repo_enter_defaults_to_skip_gitignore_update() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir(dir.path().join(".git")).unwrap();
+
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(dir.path());
+    command.write_stdin("\n");
+    command.args(["init"]).assert().success();
+
+    assert!(!dir.path().join(".gitignore").exists());
+}
+
+#[test]
+fn init_in_git_repo_gitignore_skip_mode_does_not_update() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir(dir.path().join(".git")).unwrap();
+
+    cmd(&dir)
+        .args(["init", "--gitignore", "skip"])
+        .assert()
+        .success();
 
     assert!(!dir.path().join(".gitignore").exists());
 }

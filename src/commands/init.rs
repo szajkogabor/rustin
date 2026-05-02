@@ -1,13 +1,24 @@
 use crate::store::Board;
-use clap::Args;
+use clap::{Args, ValueEnum};
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum GitignoreMode {
+    Ask,
+    Add,
+    Skip,
+}
 
 #[derive(Args)]
 pub struct InitCommand {
     /// The new title for the board
     pub title: Option<String>,
+
+    /// How to handle adding .rustin.json to .gitignore
+    #[arg(long, value_enum, default_value_t = GitignoreMode::Ask)]
+    pub gitignore: GitignoreMode,
 }
 
 impl InitCommand {
@@ -22,14 +33,18 @@ impl InitCommand {
         }
 
         board.save()?;
-        maybe_offer_gitignore_entry()?;
+        maybe_offer_gitignore_entry(self.gitignore)?;
         crate::commands::list::ListCommand { columns: vec![] }.run()?;
 
         Ok(())
     }
 }
 
-fn maybe_offer_gitignore_entry() -> anyhow::Result<()> {
+fn maybe_offer_gitignore_entry(mode: GitignoreMode) -> anyhow::Result<()> {
+    if mode == GitignoreMode::Skip {
+        return Ok(());
+    }
+
     let cwd = std::env::current_dir()?;
     let Some(git_root) = find_git_root(&cwd) else {
         return Ok(());
@@ -37,6 +52,17 @@ fn maybe_offer_gitignore_entry() -> anyhow::Result<()> {
 
     let gitignore_path = git_root.join(".gitignore");
     if gitignore_contains(&gitignore_path, ".rustin.json")? {
+        return Ok(());
+    }
+
+    if mode == GitignoreMode::Add {
+        append_gitignore_entry(&gitignore_path, ".rustin.json")?;
+        tracing::info!("Added .rustin.json to {}", gitignore_path.display());
+        return Ok(());
+    }
+
+    if !should_prompt_for_gitignore(io::stdin().is_terminal(), io::stdout().is_terminal()) {
+        tracing::debug!("Skipping .gitignore prompt because terminal is non-interactive");
         return Ok(());
     }
 
@@ -52,6 +78,10 @@ fn maybe_offer_gitignore_entry() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn should_prompt_for_gitignore(stdin_is_terminal: bool, stdout_is_terminal: bool) -> bool {
+    stdin_is_terminal && stdout_is_terminal
 }
 
 fn find_git_root(start: &Path) -> Option<PathBuf> {
@@ -95,7 +125,10 @@ fn append_gitignore_entry(path: &Path, entry: &str) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{append_gitignore_entry, find_git_root, gitignore_contains};
+    use super::{
+        GitignoreMode, append_gitignore_entry, find_git_root, gitignore_contains,
+        should_prompt_for_gitignore,
+    };
     use crate::store::Board;
     use std::fs;
     use tempfile::TempDir;
@@ -152,5 +185,20 @@ mod tests {
 
         assert!(gitignore_contains(&gitignore, ".rustin.json").unwrap());
         assert!(!gitignore_contains(&gitignore, "rustin").unwrap());
+    }
+
+    #[test]
+    fn should_prompt_for_gitignore_requires_interactive_streams() {
+        assert!(should_prompt_for_gitignore(true, true));
+        assert!(!should_prompt_for_gitignore(true, false));
+        assert!(!should_prompt_for_gitignore(false, true));
+        assert!(!should_prompt_for_gitignore(false, false));
+    }
+
+    #[test]
+    fn gitignore_mode_values_are_distinct() {
+        assert_ne!(GitignoreMode::Ask, GitignoreMode::Add);
+        assert_ne!(GitignoreMode::Add, GitignoreMode::Skip);
+        assert_ne!(GitignoreMode::Ask, GitignoreMode::Skip);
     }
 }
