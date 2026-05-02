@@ -81,6 +81,13 @@ fn horizontal_bar(duration: Duration, max_duration: Duration, width: usize) -> S
     format!("|{}{}|", "█".repeat(filled), "░".repeat(empty))
 }
 
+// Activity stats count only completed In Progress -> Done cycles.
+//
+// Semantics:
+// - entering In Progress starts or restarts the active timer;
+// - leaving In Progress for anything other than Done abandons that run;
+// - reaching Done without a known In Progress start is ignored;
+// - a task still In Progress at the end of history does not contribute time yet.
 fn task_stat(task: &Task) -> TaskStat {
     let mut started_at: Option<DateTime<Utc>> = None;
     let mut total_active_time = Duration::zero();
@@ -207,6 +214,57 @@ mod tests {
         let stat = task_stat(&task);
         assert_eq!(stat.total_active_time, Duration::minutes(30));
         assert_eq!(stat.completed_cycles, 1);
+    }
+
+    #[test]
+    fn task_stat_restarts_timer_on_repeated_inprogress_transition() {
+        let task = make_task(vec![
+            StatusTransition {
+                from: TaskStatus::Todo,
+                to: TaskStatus::InProgress,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
+            },
+            StatusTransition {
+                from: TaskStatus::Todo,
+                to: TaskStatus::InProgress,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 15, 0).unwrap(),
+            },
+            StatusTransition {
+                from: TaskStatus::InProgress,
+                to: TaskStatus::Done,
+                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 45, 0).unwrap(),
+            },
+        ]);
+
+        let stat = task_stat(&task);
+        assert_eq!(stat.total_active_time, Duration::minutes(30));
+        assert_eq!(stat.completed_cycles, 1);
+    }
+
+    #[test]
+    fn task_stat_ignores_done_without_known_start() {
+        let task = make_task(vec![StatusTransition {
+            from: TaskStatus::Todo,
+            to: TaskStatus::Done,
+            at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
+        }]);
+
+        let stat = task_stat(&task);
+        assert_eq!(stat.total_active_time, Duration::zero());
+        assert_eq!(stat.completed_cycles, 0);
+    }
+
+    #[test]
+    fn task_stat_ignores_open_inprogress_run_at_end_of_history() {
+        let task = make_task(vec![StatusTransition {
+            from: TaskStatus::Todo,
+            to: TaskStatus::InProgress,
+            at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
+        }]);
+
+        let stat = task_stat(&task);
+        assert_eq!(stat.total_active_time, Duration::zero());
+        assert_eq!(stat.completed_cycles, 0);
     }
 
     #[test]
