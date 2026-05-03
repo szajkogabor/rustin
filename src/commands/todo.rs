@@ -1,4 +1,5 @@
 use crate::store::TaskStatus;
+use anyhow::Result;
 use clap::Args;
 
 #[derive(Args)]
@@ -8,7 +9,7 @@ pub struct TodoCommand {
 }
 
 impl TodoCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         crate::commands::move_task_and_list(self.id, TaskStatus::Todo, "Todo")
     }
 }

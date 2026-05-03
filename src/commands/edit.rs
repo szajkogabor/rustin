@@ -1,4 +1,5 @@
 use crate::store::{Board, TaskKind, TaskPriority};
+use anyhow::Result;
 use clap::Args;
 
 #[derive(Args)]
@@ -24,7 +25,7 @@ pub struct EditCommand {
 }
 
 impl EditCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let mut board = Board::load()?;
 
         let task = board

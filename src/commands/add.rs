@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Args;
 
 #[derive(Args)]
@@ -22,7 +23,7 @@ use crate::store::{Board, Task, TaskStatus};
 use chrono::Utc;
 
 impl AddCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let mut board = Board::load()?;
 
         let task = Task {

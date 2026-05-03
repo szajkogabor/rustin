@@ -1,6 +1,7 @@
 mod commands;
 pub mod store;
 
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use time::macros::format_description;
@@ -78,7 +79,7 @@ enum Commands {
     Tui(commands::tui::TuiCommand),
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let timer = UtcTime::new(format_description!(

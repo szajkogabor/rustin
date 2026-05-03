@@ -1,5 +1,6 @@
 use crate::commands::display::task_detail_lines;
 use crate::store::Board;
+use anyhow::Result;
 use clap::Args;
 
 #[derive(Args)]
@@ -9,7 +10,7 @@ pub struct ShowCommand {
 }
 
 impl ShowCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let board = Board::load()?;
 
         let task = board

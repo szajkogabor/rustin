@@ -1,4 +1,5 @@
 use crate::store::{Board, Task, TaskStatus};
+use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use clap::Args;
 
@@ -14,7 +15,7 @@ struct TaskStat {
 }
 
 impl StatCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let board = Board::load()?;
         let mut stats: Vec<_> = board.tasks.iter().map(task_stat).collect();
         stats.sort_by(|left, right| {

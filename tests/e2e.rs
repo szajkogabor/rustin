@@ -31,16 +31,24 @@ fn init_without_title_succeeds() {
 }
 
 #[test]
-fn init_from_nested_directory_uses_project_root_for_title_and_file() {
+fn init_updates_title_when_local_board_already_exists() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["init", "First"]).assert().success();
+    cmd(&dir).args(["init", "Renamed"]).assert().success();
+
+    let board = fs::read_to_string(dir.path().join(".rustin.json")).unwrap();
+    assert!(
+        board.contains("\"title\": \"Renamed\""),
+        "board was:\n{board}"
+    );
+}
+
+#[test]
+fn init_from_nested_directory_creates_board_in_current_directory() {
     let dir = TempDir::new().unwrap();
     let project_dir = dir.path().join("project");
     let nested_dir = project_dir.join("subdir");
     fs::create_dir_all(&nested_dir).unwrap();
-    fs::write(
-        project_dir.join("Cargo.toml"),
-        "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
 
     let mut command = Command::cargo_bin("rustin").unwrap();
     command.current_dir(&nested_dir);
@@ -48,67 +56,65 @@ fn init_from_nested_directory_uses_project_root_for_title_and_file() {
         .args(["init"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("=== project ==="));
+        .stdout(predicate::str::contains("=== subdir ==="));
 
-    assert!(project_dir.join(".rustin.json").exists());
-    assert!(!nested_dir.join(".rustin.json").exists());
+    assert!(!project_dir.join(".rustin.json").exists());
+    assert!(nested_dir.join(".rustin.json").exists());
 
-    let board = fs::read_to_string(project_dir.join(".rustin.json")).unwrap();
+    let board = fs::read_to_string(nested_dir.join(".rustin.json")).unwrap();
     assert!(
-        board.contains("\"title\": \"project\""),
+        board.contains("\"title\": \"subdir\""),
         "board was:\n{board}"
     );
 }
 
 #[test]
-fn init_in_git_repo_can_add_board_file_to_gitignore() {
+fn init_with_local_gitignore_skips_prompt_in_non_interactive_mode() {
     let dir = TempDir::new().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
+    fs::write(dir.path().join(".gitignore"), "target\n").unwrap();
 
-    cmd(&dir)
-        .args(["init", "--gitignore", "add"])
-        .assert()
-        .success();
+    let mut command = Command::cargo_bin("rustin").unwrap();
+    command.current_dir(dir.path());
+    command.write_stdin("y\n");
+    command.args(["init"]).assert().success();
 
     let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    assert!(gitignore.contains(".rustin.json"));
+    assert!(!gitignore.contains(".rustin.json"));
 }
 
 #[test]
-fn init_in_git_repo_can_skip_gitignore_update() {
+fn init_with_local_gitignore_skip_answer_leaves_file_unchanged() {
     let dir = TempDir::new().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
+    fs::write(dir.path().join(".gitignore"), "target\n").unwrap();
 
     let mut command = Command::cargo_bin("rustin").unwrap();
     command.current_dir(dir.path());
     command.write_stdin("n\n");
     command.args(["init"]).assert().success();
 
-    assert!(!dir.path().join(".gitignore").exists());
+    let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(!gitignore.contains(".rustin.json"));
 }
 
 #[test]
-fn init_in_git_repo_enter_defaults_to_skip_gitignore_update() {
+fn init_with_local_gitignore_enter_defaults_to_skip_update() {
     let dir = TempDir::new().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
+    fs::write(dir.path().join(".gitignore"), "target\n").unwrap();
 
     let mut command = Command::cargo_bin("rustin").unwrap();
     command.current_dir(dir.path());
     command.write_stdin("\n");
     command.args(["init"]).assert().success();
 
-    assert!(!dir.path().join(".gitignore").exists());
+    let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(!gitignore.contains(".rustin.json"));
 }
 
 #[test]
-fn init_in_git_repo_gitignore_skip_mode_does_not_update() {
+fn init_without_local_gitignore_does_not_create_it() {
     let dir = TempDir::new().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
 
-    cmd(&dir)
-        .args(["init", "--gitignore", "skip"])
-        .assert()
-        .success();
+    cmd(&dir).args(["init"]).assert().success();
 
     assert!(!dir.path().join(".gitignore").exists());
 }

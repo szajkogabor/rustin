@@ -1,4 +1,5 @@
 use anyhow::Context;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -115,7 +116,7 @@ impl Board {
         }
     }
 
-    fn get_file_path() -> anyhow::Result<PathBuf> {
+    fn get_file_path() -> Result<PathBuf> {
         let mut current_dir = std::env::current_dir()?;
         loop {
             let potential_path = current_dir.join(".rustin.json");
@@ -134,7 +135,7 @@ impl Board {
         Ok(base_dir.join(".rustin.json"))
     }
 
-    pub fn load() -> anyhow::Result<Self> {
+    pub fn load() -> Result<Self> {
         let path = Self::get_file_path()?;
         if path.exists() {
             tracing::debug!("Loading board from {:?}", path);
@@ -167,7 +168,7 @@ impl Board {
         }
     }
 
-    pub fn save(&mut self) -> anyhow::Result<()> {
+    pub fn save(&mut self) -> Result<()> {
         self.version = current_version();
         let path = Self::get_file_path()?;
         tracing::debug!("Saving board to {:?}", path);
@@ -192,7 +193,7 @@ impl Board {
     }
 }
 
-fn save_atomically(path: &Path, content: &str) -> anyhow::Result<()> {
+pub(crate) fn save_atomically(path: &Path, content: &str) -> Result<()> {
     let temp_path = atomic_temp_path(path)?;
     let mut temp_file = fs::File::create(&temp_path).with_context(|| {
         format!(
@@ -224,7 +225,7 @@ fn save_atomically(path: &Path, content: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn atomic_temp_path(path: &Path) -> anyhow::Result<PathBuf> {
+fn atomic_temp_path(path: &Path) -> Result<PathBuf> {
     let file_name = path.file_name().with_context(|| {
         format!(
             "Failed to determine board file name for atomic save at {}.",

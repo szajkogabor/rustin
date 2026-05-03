@@ -3,6 +3,7 @@ use crate::commands::display::{
 };
 use crate::store::{Board, TaskStatus};
 use anyhow::Context;
+use anyhow::Result;
 use clap::Args;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::execute;
@@ -21,7 +22,7 @@ use std::io::{self, Stdout};
 pub struct TuiCommand;
 
 impl TuiCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let mut terminal = TerminalSession::enter()?;
         let mut app = App::load()?;
 
@@ -66,7 +67,7 @@ struct TerminalSession {
 }
 
 impl TerminalSession {
-    fn enter() -> anyhow::Result<Self> {
+    fn enter() -> Result<Self> {
         enable_raw_mode().context("failed to enable raw mode")?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -75,7 +76,7 @@ impl TerminalSession {
         Ok(Self { terminal })
     }
 
-    fn draw<F>(&mut self, render: F) -> anyhow::Result<()>
+    fn draw<F>(&mut self, render: F) -> Result<()>
     where
         F: FnOnce(&mut Frame),
     {
@@ -162,11 +163,11 @@ struct App {
 }
 
 impl App {
-    fn load() -> anyhow::Result<Self> {
+    fn load() -> Result<Self> {
         Self::load_with_selected(None)
     }
 
-    fn load_with_selected(selected_task_id: Option<u32>) -> anyhow::Result<Self> {
+    fn load_with_selected(selected_task_id: Option<u32>) -> Result<Self> {
         let board = Board::load()?;
         let columns = split_tasks(&board.tasks);
         let selected = selected_task_id
@@ -255,7 +256,7 @@ impl App {
         });
     }
 
-    fn move_selected(&mut self, status: TaskStatus) -> anyhow::Result<()> {
+    fn move_selected(&mut self, status: TaskStatus) -> Result<()> {
         let Some(task_id) = self.selected_task_id() else {
             self.status_line = "No task selected.".to_string();
             return Ok(());
@@ -274,7 +275,7 @@ impl App {
         Ok(())
     }
 
-    fn open_details(&mut self) -> anyhow::Result<()> {
+    fn open_details(&mut self) -> Result<()> {
         let Some(task_id) = self.selected_task_id() else {
             self.status_line = "No task selected.".to_string();
             return Ok(());

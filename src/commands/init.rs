@@ -1,29 +1,21 @@
 use crate::store::Board;
-use clap::{Args, ValueEnum};
+use anyhow::Context;
+use anyhow::Result;
+use clap::Args;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum GitignoreMode {
-    Ask,
-    Add,
-    Skip,
-}
 
 #[derive(Args)]
 pub struct InitCommand {
     /// The new title for the board
     pub title: Option<String>,
-
-    /// How to handle adding .rustin.json to .gitignore
-    #[arg(long, value_enum, default_value_t = GitignoreMode::Ask)]
-    pub gitignore: GitignoreMode,
 }
 
 impl InitCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
-        let mut board = Board::load()?;
+    pub fn run(&self) -> Result<()> {
+        let board_path = current_dir_board_path()?;
+        let mut board = load_or_create_local_board(&board_path)?;
 
         if let Some(new_title) = &self.title {
             board.title = new_title.clone();
@@ -32,40 +24,67 @@ impl InitCommand {
             tracing::info!("Initialized board: {}", board.title);
         }
 
-        board.save()?;
-        maybe_offer_gitignore_entry(self.gitignore)?;
+        save_local_board(&board_path, &mut board)?;
+        maybe_offer_gitignore_entry()?;
         crate::commands::list::ListCommand { columns: vec![] }.run()?;
 
         Ok(())
     }
 }
 
-fn maybe_offer_gitignore_entry(mode: GitignoreMode) -> anyhow::Result<()> {
-    if mode == GitignoreMode::Skip {
+fn current_dir_board_path() -> Result<PathBuf> {
+    Ok(std::env::current_dir()?.join(".rustin.json"))
+}
+
+fn current_version() -> String {
+    option_env!("VERGEN_GIT_DESCRIBE")
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string()
+}
+
+fn load_or_create_local_board(path: &Path) -> Result<Board> {
+    if !path.exists() {
+        let board = Board::default();
+        return Ok(board);
+    }
+
+    let content = fs::read_to_string(path).with_context(|| {
+        format!(
+            "Failed to read board file at {}. Check that the file is readable.",
+            path.display()
+        )
+    })?;
+    let mut board: Board = serde_json::from_str(&content).with_context(|| {
+        format!(
+            "Failed to parse board file at {}. The file is not valid JSON. Fix the file or remove it and run `rustin init`.",
+            path.display()
+        )
+    })?;
+    board.version = current_version();
+
+    Ok(board)
+}
+
+fn save_local_board(path: &Path, board: &mut Board) -> Result<()> {
+    board.version = current_version();
+    let content = serde_json::to_string_pretty(board)?;
+    crate::store::save_atomically(path, &content)?;
+    Ok(())
+}
+
+fn maybe_offer_gitignore_entry() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let gitignore_path = cwd.join(".gitignore");
+
+    if !gitignore_path.exists() {
         return Ok(());
     }
 
-    let cwd = std::env::current_dir()?;
-    let Some(git_root) = find_git_root(&cwd) else {
-        return Ok(());
-    };
-
-    let gitignore_path = git_root.join(".gitignore");
     if gitignore_contains(&gitignore_path, ".rustin.json")? {
         return Ok(());
     }
 
-    if mode == GitignoreMode::Add {
-        append_gitignore_entry(&gitignore_path, ".rustin.json")?;
-        tracing::info!("Added .rustin.json to {}", gitignore_path.display());
-        return Ok(());
-    }
-
     if !should_prompt_for_gitignore(io::stdin().is_terminal(), io::stdout().is_terminal()) {
-        tracing::debug!("Skipping .gitignore prompt because terminal is non-interactive");
-        println!(
-            "hint: non-interactive terminal detected; run `rustin init --gitignore add` to update .gitignore automatically"
-        );
         return Ok(());
     }
 
@@ -87,21 +106,7 @@ fn should_prompt_for_gitignore(stdin_is_terminal: bool, stdout_is_terminal: bool
     stdin_is_terminal && stdout_is_terminal
 }
 
-fn find_git_root(start: &Path) -> Option<PathBuf> {
-    let mut current = start.to_path_buf();
-
-    loop {
-        if current.join(".git").exists() {
-            return Some(current);
-        }
-
-        if !current.pop() {
-            return None;
-        }
-    }
-}
-
-fn gitignore_contains(path: &Path, entry: &str) -> anyhow::Result<bool> {
+fn gitignore_contains(path: &Path, entry: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
     }
@@ -110,7 +115,7 @@ fn gitignore_contains(path: &Path, entry: &str) -> anyhow::Result<bool> {
     Ok(content.lines().any(|line| line.trim() == entry))
 }
 
-fn append_gitignore_entry(path: &Path, entry: &str) -> anyhow::Result<()> {
+fn append_gitignore_entry(path: &Path, entry: &str) -> Result<()> {
     let mut content = if path.exists() {
         fs::read_to_string(path)?
     } else {
@@ -129,7 +134,7 @@ fn append_gitignore_entry(path: &Path, entry: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        GitignoreMode, append_gitignore_entry, find_git_root, gitignore_contains,
+        append_gitignore_entry, current_version, gitignore_contains, load_or_create_local_board,
         should_prompt_for_gitignore,
     };
     use crate::store::Board;
@@ -156,14 +161,18 @@ mod tests {
     }
 
     #[test]
-    fn find_git_root_walks_up_to_repository_root() {
+    fn load_or_create_local_board_uses_current_directory_title_for_new_board() {
         let dir = TempDir::new().unwrap();
-        let project = dir.path().join("project");
-        let nested = project.join("nested");
+        let nested = dir.path().join("nested");
         fs::create_dir_all(&nested).unwrap();
-        fs::create_dir(project.join(".git")).unwrap();
 
-        assert_eq!(find_git_root(&nested), Some(project));
+        let old_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&nested).unwrap();
+
+        let board = load_or_create_local_board(&nested.join(".rustin.json")).unwrap();
+
+        std::env::set_current_dir(old_dir).unwrap();
+        assert_eq!(board.title, "nested");
     }
 
     #[test]
@@ -199,9 +208,17 @@ mod tests {
     }
 
     #[test]
-    fn gitignore_mode_values_are_distinct() {
-        assert_ne!(GitignoreMode::Ask, GitignoreMode::Add);
-        assert_ne!(GitignoreMode::Add, GitignoreMode::Skip);
-        assert_ne!(GitignoreMode::Ask, GitignoreMode::Skip);
+    fn load_or_create_local_board_migrates_existing_board_version() {
+        let dir = TempDir::new().unwrap();
+        let board_path = dir.path().join(".rustin.json");
+        fs::write(
+            &board_path,
+            r#"{"version":"0.0.0","title":"Demo","next_id":1,"tasks":[]}"#,
+        )
+        .unwrap();
+
+        let board = load_or_create_local_board(&board_path).unwrap();
+        assert_eq!(board.title, "Demo");
+        assert_eq!(board.version, current_version());
     }
 }

@@ -3,6 +3,7 @@ use crate::commands::display::{
 };
 use crate::store::Board;
 use anyhow::Context;
+use anyhow::Result;
 use clap::Args;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
 use ratatui::backend::CrosstermBackend;
@@ -21,7 +22,7 @@ pub struct ListCommand {
 }
 
 impl ListCommand {
-    pub fn run(&self) -> anyhow::Result<()> {
+    pub fn run(&self) -> Result<()> {
         let board = Board::load()?;
         let view = ListView::from_board(&board, &self.columns);
 
@@ -41,7 +42,7 @@ struct InlineListTerminal {
 }
 
 impl InlineListTerminal {
-    fn enter(height: u16) -> anyhow::Result<Self> {
+    fn enter(height: u16) -> Result<Self> {
         enable_raw_mode().context("failed to enable raw mode for inline list rendering")?;
         let backend = CrosstermBackend::new(io::stdout());
         let terminal = Terminal::with_options(
@@ -55,7 +56,7 @@ impl InlineListTerminal {
         Ok(Self { terminal })
     }
 
-    fn draw<F>(&mut self, render: F) -> anyhow::Result<()>
+    fn draw<F>(&mut self, render: F) -> Result<()>
     where
         F: FnOnce(&mut Frame),
     {
