@@ -10,6 +10,20 @@ Rustin keeps your tasks on a small board with three states:
 
 ## Quick Start
 
+### Install via Homebrew (macOS / Linux)
+
+```bash
+brew install szajkogabor/tap/rustin
+```
+
+### Install via AUR (Arch Linux)
+
+```bash
+yay -S rustin-bin
+```
+
+### Install from source
+
 From the project root:
 
 ```bash
@@ -37,6 +51,9 @@ Rustin supports the following commands:
 - `edit` - Edit fields of a task
 - `init` - Initialize a new board or set its title
 - `tui` - Open the interactive terminal UI
+- `archive` - Archive all done tasks (soft-delete)
+- `bin` - List deleted tasks
+- `undelete` - Restore a deleted task
 - `help` - Print command help
 
 ### Aliases
@@ -51,6 +68,9 @@ Rustin supports the following commands:
 - `stat` -> `st`
 - `edit` -> `e`
 - `tui` -> `ui`
+- `archive` -> `ar`
+- `bin` -> `b`
+- `undelete` -> `ud`
 
 ## Options
 

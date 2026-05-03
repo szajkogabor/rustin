@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0-rc.4-8-gbe8753c",
+  "version": "1.0.0-rc.4-8-g7721457",
   "title": "rustin",
   "next_id": 10,
   "tasks": [
@@ -148,9 +148,20 @@
       "priority": "medium",
       "kind": "ci",
       "description": "idealy it should be installable as 'brew install rustin', but if it is not possible than create a tap. it should publish it to brew when a release build created",
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:56:28.571747Z",
-      "transitions": [],
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:57:55.175105Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:59:47.598592Z"
+        }
+      ],
       "deleted_at": null
     },
     {
@@ -159,9 +170,20 @@
       "priority": "medium",
       "kind": "ci",
       "description": "publish to aur when a release is built",
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:57:11.725895Z",
-      "transitions": [],
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:59:48.183508Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:59:48.785610Z"
+        }
+      ],
       "deleted_at": null
     }
   ]

@@ -1,0 +1,18 @@
+# Maintainer: Gabor Szajko <szajkogabor@gmail.com>
+pkgname=rustin-bin
+pkgver=VERSION
+pkgrel=1
+pkgdesc="A fast, modern, cross-platform to-do list manager written in Rust"
+arch=('x86_64')
+url="https://github.com/szajkogabor/rustin"
+license=('MIT')
+provides=('rustin')
+conflicts=('rustin')
+source=("${url}/releases/download/${pkgver}/rustin-${pkgver}-x86_64-unknown-linux-gnu.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 rustin "${pkgdir}/usr/bin/rustin"
+    install -Dm644 /dev/null "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
+

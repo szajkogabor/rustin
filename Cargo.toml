@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/szajkogabor/rustin"
 keywords = ["cli", "todo", "kanban", "productivity"]
 categories = ["development-tools::cli-utils"]
+version = "1.0.0"
 
 [dependencies]
 anyhow = "1.0.102"
