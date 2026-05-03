@@ -213,6 +213,8 @@ pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
 
     if let Some(desc) = &task.description {
         lines.push(format!("Description: {}", desc));
+    } else {
+        lines.push("Description: (none)".to_string());
     }
     if !task.transitions.is_empty() {
         lines.push("History:".to_string());
@@ -445,5 +447,26 @@ mod tests {
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
         assert_eq!(formatted, expected);
+    }
+
+    #[test]
+    fn task_detail_lines_show_none_placeholder_when_description_is_missing() {
+        let task = Task {
+            id: 1,
+            title: "No desc".to_string(),
+            priority: TaskPriority::Medium,
+            kind: TaskKind::Feature,
+            description: None,
+            status: TaskStatus::Todo,
+            created_at: Utc::now(),
+            transitions: vec![],
+        };
+
+        let lines = task_detail_lines(&task);
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("Description: (none)"))
+        );
     }
 }

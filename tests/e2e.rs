@@ -739,7 +739,7 @@ fn edit_clears_description_with_empty_string() {
         .args(["show", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Description:").not());
+        .stdout(predicate::str::contains("Description: (none)"));
 }
 
 #[test]
