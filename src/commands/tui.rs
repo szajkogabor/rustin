@@ -1,9 +1,10 @@
 use crate::commands::display::{
     TaskColumn, TaskColumns, split_tasks, status_label, task_detail_lines, task_snapshot_lines,
 };
-use crate::store::{Board, TaskStatus};
+use crate::store::{Board, Task, TaskKind, TaskPriority, TaskStatus};
 use anyhow::Context;
 use anyhow::Result;
+use chrono::Utc;
 use clap::Args;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::execute;
@@ -34,6 +35,27 @@ impl TuiCommand {
                     continue;
                 }
 
+                match &app.input_mode {
+                    Some(InputMode::AddTask { .. }) | Some(InputMode::EditTitle { .. }) => {
+                        match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_input()?,
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        }
+                        continue;
+                    }
+                    Some(InputMode::ConfirmRemove { .. }) => {
+                        match key.code {
+                            KeyCode::Char('y') => app.confirm_remove()?,
+                            _ => app.cancel_input(),
+                        }
+                        continue;
+                    }
+                    None => {}
+                }
+
                 if app.showing_details() {
                     match key.code {
                         KeyCode::Enter | KeyCode::Esc => app.close_details(),
@@ -52,6 +74,9 @@ impl TuiCommand {
                     KeyCode::Char('t') => app.move_selected(TaskStatus::Todo)?,
                     KeyCode::Char('i') => app.move_selected(TaskStatus::InProgress)?,
                     KeyCode::Char('d') => app.move_selected(TaskStatus::Done)?,
+                    KeyCode::Char('a') => app.start_add(),
+                    KeyCode::Char('e') => app.start_edit(),
+                    KeyCode::Char('r') => app.start_remove(),
                     KeyCode::Char('q') | KeyCode::Esc => break,
                     _ => {}
                 }
@@ -154,11 +179,19 @@ impl TaskColumns {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InputMode {
+    AddTask { buffer: String },
+    EditTitle { task_id: u32, buffer: String },
+    ConfirmRemove { task_id: u32, title: String },
+}
+
 struct App {
     title: String,
     columns: TaskColumns,
     selected: Option<Selection>,
     detail_lines: Option<Vec<String>>,
+    input_mode: Option<InputMode>,
     status_line: String,
 }
 
@@ -174,9 +207,9 @@ impl App {
             .and_then(|task_id| columns.find_selection(task_id))
             .or_else(|| columns.first_selection());
         let status_line = if selected.is_none() {
-            "No tasks yet. Press q to quit.".to_string()
+            "No tasks yet. Press a to add or q to quit.".to_string()
         } else {
-            "Arrow keys move across the board. Enter shows details. t/i/d change status. q quits."
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, x remove. q quits."
                 .to_string()
         };
 
@@ -185,6 +218,7 @@ impl App {
             columns,
             selected,
             detail_lines: None,
+            input_mode: None,
             status_line,
         })
     }
@@ -295,11 +329,141 @@ impl App {
     fn close_details(&mut self) {
         self.detail_lines = None;
         self.status_line = if self.selected.is_some() {
-            "Arrow keys move across the board. Enter shows details. t/i/d change status. q quits."
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, x remove. q quits."
                 .to_string()
         } else {
-            "No tasks yet. Press q to quit.".to_string()
+            "No tasks yet. Press a to add or q to quit.".to_string()
         };
+    }
+
+    fn start_add(&mut self) {
+        self.input_mode = Some(InputMode::AddTask {
+            buffer: String::new(),
+        });
+        self.status_line = "Type task title, Enter to add, Esc to cancel.".to_string();
+    }
+
+    fn start_edit(&mut self) {
+        let Some(task_id) = self.selected_task_id() else {
+            self.status_line = "No task selected.".to_string();
+            return;
+        };
+        let current_title = self
+            .selected
+            .and_then(|s| self.columns.tasks(s.column).get(s.index))
+            .map(|row| row.title.clone())
+            .unwrap_or_default();
+        self.input_mode = Some(InputMode::EditTitle {
+            task_id,
+            buffer: current_title,
+        });
+        self.status_line = "Edit title, Enter to save, Esc to cancel.".to_string();
+    }
+
+    fn start_remove(&mut self) {
+        let Some(task_id) = self.selected_task_id() else {
+            self.status_line = "No task selected.".to_string();
+            return;
+        };
+        let title = self
+            .selected
+            .and_then(|s| self.columns.tasks(s.column).get(s.index))
+            .map(|row| row.title.clone())
+            .unwrap_or_default();
+        self.input_mode = Some(InputMode::ConfirmRemove { task_id, title });
+        self.status_line =
+            format!("Remove task {task_id}? Press y to confirm, any other key to cancel.");
+    }
+
+    fn input_char(&mut self, c: char) {
+        match &mut self.input_mode {
+            Some(InputMode::AddTask { buffer }) | Some(InputMode::EditTitle { buffer, .. }) => {
+                buffer.push(c);
+            }
+            _ => {}
+        }
+    }
+
+    fn input_backspace(&mut self) {
+        match &mut self.input_mode {
+            Some(InputMode::AddTask { buffer }) | Some(InputMode::EditTitle { buffer, .. }) => {
+                buffer.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn cancel_input(&mut self) {
+        self.input_mode = None;
+        self.status_line = "Cancelled.".to_string();
+    }
+
+    fn submit_input(&mut self) -> Result<()> {
+        let mode = self.input_mode.take();
+        match mode {
+            Some(InputMode::AddTask { buffer }) => {
+                let title = buffer.trim().to_string();
+                if title.is_empty() {
+                    self.status_line = "Empty title, task not added.".to_string();
+                    return Ok(());
+                }
+                let mut board = Board::load()?;
+                let task = Task {
+                    id: board.next_id,
+                    title: title.clone(),
+                    priority: TaskPriority::Medium,
+                    kind: TaskKind::Feature,
+                    description: None,
+                    status: TaskStatus::Todo,
+                    created_at: Utc::now(),
+                    transitions: vec![],
+                };
+                let new_id = task.id;
+                board.next_id += 1;
+                board.tasks.push(task);
+                board.save()?;
+                let mut refreshed = Self::load_with_selected(Some(new_id))?;
+                refreshed.status_line = format!("Task {new_id} added: {title}");
+                *self = refreshed;
+            }
+            Some(InputMode::EditTitle { task_id, buffer }) => {
+                let title = buffer.trim().to_string();
+                if title.is_empty() {
+                    self.status_line = "Empty title, edit cancelled.".to_string();
+                    return Ok(());
+                }
+                let mut board = Board::load()?;
+                if let Some(task) = board.tasks.iter_mut().find(|t| t.id == task_id) {
+                    task.title = title.clone();
+                    board.save()?;
+                    let mut refreshed = Self::load_with_selected(Some(task_id))?;
+                    refreshed.status_line = format!("Task {task_id} renamed to: {title}");
+                    *self = refreshed;
+                } else {
+                    self.status_line = format!("Task {task_id} no longer exists.");
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn confirm_remove(&mut self) -> Result<()> {
+        let mode = self.input_mode.take();
+        if let Some(InputMode::ConfirmRemove { task_id, .. }) = mode {
+            let mut board = Board::load()?;
+            let before = board.tasks.len();
+            board.tasks.retain(|t| t.id != task_id);
+            if board.tasks.len() < before {
+                board.save()?;
+                let mut refreshed = Self::load_with_selected(None)?;
+                refreshed.status_line = format!("Task {task_id} removed.");
+                *self = refreshed;
+            } else {
+                self.status_line = format!("Task {task_id} no longer exists.");
+            }
+        }
+        Ok(())
     }
 
     fn render(&self, frame: &mut Frame) {
@@ -349,6 +513,10 @@ impl App {
 
         if let Some(lines) = &self.detail_lines {
             self.render_detail_overlay(frame, lines);
+        }
+
+        if let Some(mode) = &self.input_mode {
+            self.render_input_overlay(frame, mode);
         }
     }
 
@@ -405,6 +573,34 @@ impl App {
         frame.render_widget(Clear, popup_area);
         frame.render_widget(popup, popup_area);
     }
+
+    fn render_input_overlay(&self, frame: &mut Frame, mode: &InputMode) {
+        let popup_area = centered_rect(60, 20, frame.area());
+        let (title, content) = match mode {
+            InputMode::AddTask { buffer } => ("Add task", buffer.as_str()),
+            InputMode::EditTitle { buffer, .. } => ("Edit title", buffer.as_str()),
+            InputMode::ConfirmRemove { task_id, title } => {
+                let area = centered_rect(60, 20, frame.area());
+                let text = format!(
+                    "Remove task [{task_id}] \"{title}\"?\n\nPress y to confirm, any other key to cancel."
+                );
+                let popup = Paragraph::new(text).wrap(Wrap { trim: false }).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Confirm remove"),
+                );
+                frame.render_widget(Clear, area);
+                frame.render_widget(popup, area);
+                return;
+            }
+        };
+
+        let display_text = format!("{content}█");
+        let popup =
+            Paragraph::new(display_text).block(Block::default().borders(Borders::ALL).title(title));
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup, popup_area);
+    }
 }
 
 fn centered_rect(
@@ -433,7 +629,7 @@ fn centered_rect(
 
 #[cfg(test)]
 mod tests {
-    use super::{App, Selection};
+    use super::{App, InputMode, Selection};
     use crate::commands::display::{TaskColumn, TaskColumns, TaskRow, format_task, split_tasks};
     use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::Utc;
@@ -468,6 +664,7 @@ mod tests {
             columns,
             selected,
             detail_lines: None,
+            input_mode: None,
             status_line: String::new(),
         }
     }
@@ -599,5 +796,112 @@ mod tests {
         assert_eq!(columns.todo[0].summary, format_task(&task));
         assert_eq!(columns.todo[0].priority, "🔥");
         assert_eq!(columns.todo[0].kind, "🐛");
+    }
+
+    #[test]
+    fn start_add_sets_input_mode_and_status() {
+        let mut app = app_with_columns(
+            columns(&[1], &[], &[]),
+            Some(Selection {
+                column: TaskColumn::Todo,
+                index: 0,
+            }),
+        );
+        app.start_add();
+        assert_eq!(
+            app.input_mode,
+            Some(InputMode::AddTask {
+                buffer: String::new()
+            })
+        );
+        assert!(app.status_line.contains("Type task title"));
+    }
+
+    #[test]
+    fn start_edit_sets_input_mode_with_current_title() {
+        let mut app = app_with_columns(
+            columns(&[1], &[], &[]),
+            Some(Selection {
+                column: TaskColumn::Todo,
+                index: 0,
+            }),
+        );
+        app.start_edit();
+        match &app.input_mode {
+            Some(InputMode::EditTitle { task_id, buffer }) => {
+                assert_eq!(*task_id, 1);
+                assert_eq!(buffer, "task-1");
+            }
+            other => panic!("expected EditTitle, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn start_remove_sets_confirm_mode() {
+        let mut app = app_with_columns(
+            columns(&[1], &[], &[]),
+            Some(Selection {
+                column: TaskColumn::Todo,
+                index: 0,
+            }),
+        );
+        app.start_remove();
+        match &app.input_mode {
+            Some(InputMode::ConfirmRemove { task_id, .. }) => {
+                assert_eq!(*task_id, 1);
+            }
+            other => panic!("expected ConfirmRemove, got {:?}", other),
+        }
+        assert!(app.status_line.contains("Press y to confirm"));
+    }
+
+    #[test]
+    fn input_char_and_backspace_modify_buffer() {
+        let mut app = app_with_columns(columns(&[], &[], &[]), None);
+        app.input_mode = Some(InputMode::AddTask {
+            buffer: String::new(),
+        });
+        app.input_char('h');
+        app.input_char('i');
+        assert_eq!(
+            app.input_mode,
+            Some(InputMode::AddTask {
+                buffer: "hi".to_string()
+            })
+        );
+        app.input_backspace();
+        assert_eq!(
+            app.input_mode,
+            Some(InputMode::AddTask {
+                buffer: "h".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn cancel_input_clears_mode() {
+        let mut app = app_with_columns(columns(&[], &[], &[]), None);
+        app.input_mode = Some(InputMode::AddTask {
+            buffer: "test".to_string(),
+        });
+        app.cancel_input();
+        assert!(app.input_mode.is_none());
+        assert_eq!(app.status_line, "Cancelled.");
+    }
+
+    #[test]
+    fn start_edit_with_no_selection_shows_message() {
+        let mut app = app_with_columns(columns(&[], &[], &[]), None);
+        app.start_edit();
+        assert!(app.input_mode.is_none());
+        assert_eq!(app.status_line, "No task selected.");
+    }
+
+    #[test]
+    fn start_remove_with_no_selection_shows_message() {
+        let mut app = app_with_columns(columns(&[], &[], &[]), None);
+        app.start_remove();
+        assert!(app.input_mode.is_none());
+        assert_eq!(app.status_line, "No task selected.");
     }
 }
