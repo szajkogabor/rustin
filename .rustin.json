@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0-rc.4",
+  "version": "1.0.0-rc.4-5-g1caa846",
   "title": "rustin",
-  "next_id": 4,
+  "next_id": 8,
   "tasks": [
     {
       "id": 1,
@@ -9,9 +9,15 @@
       "priority": "medium",
       "kind": "feature",
       "description": "tui view should have add, edit and remove commands. it should show a dialog to ask for task fields. tab to navigate between input fields and buttons",
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T12:53:42.544522Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "done",
+          "at": "2026-05-03T13:42:38.600008Z"
+        }
+      ]
     },
     {
       "id": 2,
@@ -19,9 +25,15 @@
       "priority": "medium",
       "kind": "bug",
       "description": null,
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T12:54:16.360187Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "done",
+          "at": "2026-05-03T13:42:41.350650Z"
+        }
+      ]
     },
     {
       "id": 3,
@@ -29,8 +41,54 @@
       "priority": "medium",
       "kind": "feature",
       "description": null,
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T12:54:33.500259Z",
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "done",
+          "at": "2026-05-03T13:42:49.379163Z"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "remove task only virtually delete task",
+      "priority": "medium",
+      "kind": "feature",
+      "description": "remove just set a removed flag, so the task always can be undeleted",
+      "status": "todo",
+      "created_at": "2026-05-03T13:43:09.377401Z",
+      "transitions": []
+    },
+    {
+      "id": 5,
+      "title": "archive command",
+      "priority": "medium",
+      "kind": "feature",
+      "description": "archive every task which older then the given days",
+      "status": "todo",
+      "created_at": "2026-05-03T13:43:25.061795Z",
+      "transitions": []
+    },
+    {
+      "id": 6,
+      "title": "bin commands show all deleted task, similar to list",
+      "priority": "medium",
+      "kind": "feature",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-05-03T13:44:56.656702Z",
+      "transitions": []
+    },
+    {
+      "id": 7,
+      "title": "undelete command, resurrect a deleted task",
+      "priority": "medium",
+      "kind": "feature",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-05-03T13:45:17.027378Z",
       "transitions": []
     }
   ]
