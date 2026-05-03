@@ -77,6 +77,9 @@ impl TuiCommand {
                     KeyCode::Char('a') => app.start_add(),
                     KeyCode::Char('e') => app.start_edit(),
                     KeyCode::Char('r') => app.start_remove(),
+                    KeyCode::Char('1') => app.set_priority(TaskPriority::Low)?,
+                    KeyCode::Char('2') => app.set_priority(TaskPriority::Medium)?,
+                    KeyCode::Char('3') => app.set_priority(TaskPriority::High)?,
                     KeyCode::Char('q') | KeyCode::Esc => break,
                     _ => {}
                 }
@@ -209,7 +212,7 @@ impl App {
         let status_line = if selected.is_none() {
             "No tasks yet. Press a to add or q to quit.".to_string()
         } else {
-            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, x remove. q quits."
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, r remove. 1/2/3 priority. q quits."
                 .to_string()
         };
 
@@ -329,7 +332,7 @@ impl App {
     fn close_details(&mut self) {
         self.detail_lines = None;
         self.status_line = if self.selected.is_some() {
-            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, x remove. q quits."
+            "Arrow keys move across the board. Enter shows details. t/i/d change status. a add, e edit, r remove. 1/2/3 priority. q quits."
                 .to_string()
         } else {
             "No tasks yet. Press a to add or q to quit.".to_string()
@@ -463,6 +466,26 @@ impl App {
                 self.status_line = format!("Task {task_id} no longer exists.");
             }
         }
+        Ok(())
+    }
+
+    fn set_priority(&mut self, priority: TaskPriority) -> Result<()> {
+        let Some(task_id) = self.selected_task_id() else {
+            self.status_line = "No task selected.".to_string();
+            return Ok(());
+        };
+
+        let mut board = Board::load()?;
+        if let Some(task) = board.tasks.iter_mut().find(|t| t.id == task_id) {
+            task.priority = priority;
+            board.save()?;
+            let mut refreshed = Self::load_with_selected(Some(task_id))?;
+            refreshed.status_line = format!("Task {task_id} priority set to {priority:?}.");
+            *self = refreshed;
+        } else {
+            self.status_line = format!("Task {task_id} no longer exists.");
+        }
+
         Ok(())
     }
 
@@ -902,6 +925,13 @@ mod tests {
         let mut app = app_with_columns(columns(&[], &[], &[]), None);
         app.start_remove();
         assert!(app.input_mode.is_none());
+        assert_eq!(app.status_line, "No task selected.");
+    }
+
+    #[test]
+    fn set_priority_with_no_selection_shows_message() {
+        let mut app = app_with_columns(columns(&[], &[], &[]), None);
+        app.set_priority(TaskPriority::High).unwrap();
         assert_eq!(app.status_line, "No task selected.");
     }
 }
