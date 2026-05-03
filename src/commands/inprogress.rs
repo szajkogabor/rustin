@@ -29,6 +29,7 @@ mod tests {
             status,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         }
     }
 

@@ -420,6 +420,7 @@ impl App {
                     status: TaskStatus::Todo,
                     created_at: Utc::now(),
                     transitions: vec![],
+                    deleted_at: None,
                 };
                 let new_id = task.id;
                 board.next_id += 1;
@@ -455,15 +456,13 @@ impl App {
         let mode = self.input_mode.take();
         if let Some(InputMode::ConfirmRemove { task_id, .. }) = mode {
             let mut board = Board::load()?;
-            let before = board.tasks.len();
-            board.tasks.retain(|t| t.id != task_id);
-            if board.tasks.len() < before {
+            if board.soft_delete(task_id) {
                 board.save()?;
                 let mut refreshed = Self::load_with_selected(None)?;
                 refreshed.status_line = format!("Task {task_id} removed.");
                 *self = refreshed;
             } else {
-                self.status_line = format!("Task {task_id} no longer exists.");
+                self.status_line = format!("Task {task_id} not found.");
             }
         }
         Ok(())
@@ -812,6 +811,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         };
 
         let columns = split_tasks(std::slice::from_ref(&task));

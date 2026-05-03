@@ -167,7 +167,7 @@ pub(crate) fn task_order(left: &Task, right: &Task) -> Ordering {
 }
 
 pub(crate) fn split_tasks(tasks: &[Task]) -> TaskColumns {
-    let mut ordered: Vec<&Task> = tasks.iter().collect();
+    let mut ordered: Vec<&Task> = tasks.iter().filter(|t| t.deleted_at.is_none()).collect();
     ordered.sort_by(|left, right| task_order(left, right));
 
     let mut columns = TaskColumns::default();
@@ -252,6 +252,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         }
     }
 
@@ -269,6 +270,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at,
             transitions: vec![],
+            deleted_at: None,
         }
     }
 
@@ -403,6 +405,7 @@ mod tests {
                 to: TaskStatus::Done,
                 at: transitioned,
             }],
+            deleted_at: None,
         };
 
         let lines = task_detail_lines(&task);
@@ -462,6 +465,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         };
 
         let lines = task_detail_lines(&task);

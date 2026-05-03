@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0-rc.4-5-g1caa846",
+  "version": "1.0.0-rc.4-8-gbe8753c",
   "title": "rustin",
-  "next_id": 8,
+  "next_id": 10,
   "tasks": [
     {
       "id": 1,
@@ -17,7 +17,8 @@
           "to": "done",
           "at": "2026-05-03T13:42:38.600008Z"
         }
-      ]
+      ],
+      "deleted_at": null
     },
     {
       "id": 2,
@@ -33,7 +34,8 @@
           "to": "done",
           "at": "2026-05-03T13:42:41.350650Z"
         }
-      ]
+      ],
+      "deleted_at": null
     },
     {
       "id": 3,
@@ -49,7 +51,8 @@
           "to": "done",
           "at": "2026-05-03T13:42:49.379163Z"
         }
-      ]
+      ],
+      "deleted_at": null
     },
     {
       "id": 4,
@@ -57,9 +60,21 @@
       "priority": "medium",
       "kind": "feature",
       "description": "remove just set a removed flag, so the task always can be undeleted",
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:43:09.377401Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:48:00.612253Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:51:42.419610Z"
+        }
+      ],
+      "deleted_at": null
     },
     {
       "id": 5,
@@ -67,9 +82,21 @@
       "priority": "medium",
       "kind": "feature",
       "description": "archive every task which older then the given days",
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:43:25.061795Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:51:49.796557Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:51:50.457194Z"
+        }
+      ],
+      "deleted_at": null
     },
     {
       "id": 6,
@@ -77,9 +104,21 @@
       "priority": "medium",
       "kind": "feature",
       "description": null,
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:44:56.656702Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:51:51.088063Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:51:51.692859Z"
+        }
+      ],
+      "deleted_at": null
     },
     {
       "id": 7,
@@ -87,9 +126,43 @@
       "priority": "medium",
       "kind": "feature",
       "description": null,
-      "status": "todo",
+      "status": "done",
       "created_at": "2026-05-03T13:45:17.027378Z",
-      "transitions": []
+      "transitions": [
+        {
+          "from": "todo",
+          "to": "in-progress",
+          "at": "2026-05-03T13:51:52.359410Z"
+        },
+        {
+          "from": "in-progress",
+          "to": "done",
+          "at": "2026-05-03T13:51:52.994845Z"
+        }
+      ],
+      "deleted_at": null
+    },
+    {
+      "id": 8,
+      "title": "make it installable through brew",
+      "priority": "medium",
+      "kind": "ci",
+      "description": "idealy it should be installable as 'brew install rustin', but if it is not possible than create a tap. it should publish it to brew when a release build created",
+      "status": "todo",
+      "created_at": "2026-05-03T13:56:28.571747Z",
+      "transitions": [],
+      "deleted_at": null
+    },
+    {
+      "id": 9,
+      "title": "make this app available trough arch aur",
+      "priority": "medium",
+      "kind": "ci",
+      "description": "publish to aur when a release is built",
+      "status": "todo",
+      "created_at": "2026-05-03T13:57:11.725895Z",
+      "transitions": [],
+      "deleted_at": null
     }
   ]
 }

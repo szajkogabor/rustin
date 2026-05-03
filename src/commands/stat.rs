@@ -158,6 +158,7 @@ mod tests {
             status: TaskStatus::Done,
             created_at: Utc.with_ymd_and_hms(2024, 1, 1, 9, 0, 0).unwrap(),
             transitions,
+            deleted_at: None,
         }
     }
 

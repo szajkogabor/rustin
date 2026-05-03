@@ -77,6 +77,15 @@ enum Commands {
     /// Open an interactive terminal UI
     #[command(visible_alias = "ui")]
     Tui(commands::tui::TuiCommand),
+    /// Archive all done tasks (soft-delete)
+    #[command(visible_alias = "ar")]
+    Archive(commands::archive::ArchiveCommand),
+    /// List deleted tasks
+    #[command(visible_alias = "b")]
+    Bin(commands::bin::BinCommand),
+    /// Restore a deleted task
+    #[command(visible_alias = "ud")]
+    Undelete(commands::undelete::UndeleteCommand),
 }
 
 fn main() -> Result<()> {
@@ -134,6 +143,9 @@ fn main() -> Result<()> {
         Commands::Edit(cmd) => cmd.run()?,
         Commands::Init(cmd) => cmd.run()?,
         Commands::Tui(cmd) => cmd.run()?,
+        Commands::Archive(cmd) => cmd.run()?,
+        Commands::Bin(cmd) => cmd.run()?,
+        Commands::Undelete(cmd) => cmd.run()?,
     }
 
     Ok(())

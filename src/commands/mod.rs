@@ -2,6 +2,8 @@ use crate::store::{Board, TaskStatus};
 use anyhow::Result;
 
 pub mod add;
+pub mod archive;
+pub mod bin;
 pub mod display;
 pub mod done;
 pub mod edit;
@@ -13,6 +15,7 @@ pub mod show;
 pub mod stat;
 pub mod todo;
 pub mod tui;
+pub mod undelete;
 
 pub(crate) fn move_task_and_list(id: u32, to: TaskStatus, status_label: &str) -> Result<()> {
     let mut board = Board::load()?;

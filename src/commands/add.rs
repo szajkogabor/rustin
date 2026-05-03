@@ -35,6 +35,7 @@ impl AddCommand {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         };
 
         board.next_id += 1;
@@ -63,6 +64,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         }
     }
 

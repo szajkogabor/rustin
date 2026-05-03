@@ -26,6 +26,8 @@ pub struct Task {
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(default)]
     pub transitions: Vec<StatusTransition>,
+    #[serde(default)]
+    pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(
@@ -178,8 +180,64 @@ impl Board {
         Ok(())
     }
 
+    pub fn active_tasks(&self) -> Vec<&Task> {
+        self.tasks
+            .iter()
+            .filter(|t| t.deleted_at.is_none())
+            .collect()
+    }
+
+    pub fn deleted_tasks(&self) -> Vec<&Task> {
+        self.tasks
+            .iter()
+            .filter(|t| t.deleted_at.is_some())
+            .collect()
+    }
+
+    pub fn soft_delete(&mut self, id: u32) -> bool {
+        if let Some(task) = self
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == id && t.deleted_at.is_none())
+        {
+            task.deleted_at = Some(chrono::Utc::now());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn undelete(&mut self, id: u32) -> bool {
+        if let Some(task) = self
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == id && t.deleted_at.is_some())
+        {
+            task.deleted_at = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn archive_done(&mut self) -> usize {
+        let now = chrono::Utc::now();
+        let mut count = 0;
+        for task in &mut self.tasks {
+            if task.status == TaskStatus::Done && task.deleted_at.is_none() {
+                task.deleted_at = Some(now);
+                count += 1;
+            }
+        }
+        count
+    }
+
     pub fn move_task(&mut self, id: u32, to: TaskStatus) -> bool {
-        if let Some(task) = self.tasks.iter_mut().find(|task| task.id == id) {
+        if let Some(task) = self
+            .tasks
+            .iter_mut()
+            .find(|task| task.id == id && task.deleted_at.is_none())
+        {
             let from = task.status.clone();
             task.transitions.push(StatusTransition {
                 from,
@@ -262,6 +320,7 @@ mod tests {
             status,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         }
     }
 
@@ -323,6 +382,13 @@ mod tests {
     }
 
     #[test]
+    fn task_deserializes_missing_deleted_at_as_none() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert!(task.deleted_at.is_none());
+    }
+
+    #[test]
     fn board_deserializes_missing_version_with_default() {
         let json = r#"{"title":"MyBoard","next_id":1,"tasks":[]}"#;
         let board: Board = serde_json::from_str(json).unwrap();
@@ -364,6 +430,125 @@ mod tests {
         };
 
         assert!(!board.move_task(99, TaskStatus::Done));
+    }
+
+    #[test]
+    fn soft_delete_sets_deleted_at() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        assert!(board.soft_delete(1));
+        assert!(board.tasks[0].deleted_at.is_some());
+    }
+
+    #[test]
+    fn soft_delete_returns_false_for_already_deleted() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        assert!(board.soft_delete(1));
+        assert!(!board.soft_delete(1));
+    }
+
+    #[test]
+    fn undelete_clears_deleted_at() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        board.soft_delete(1);
+        assert!(board.undelete(1));
+        assert!(board.tasks[0].deleted_at.is_none());
+    }
+
+    #[test]
+    fn undelete_returns_false_for_active_task() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        assert!(!board.undelete(1));
+    }
+
+    #[test]
+    fn archive_done_soft_deletes_done_tasks_only() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 4,
+            tasks: vec![
+                make_task(1, TaskStatus::Todo),
+                make_task(2, TaskStatus::Done),
+                make_task(3, TaskStatus::Done),
+            ],
+        };
+
+        let count = board.archive_done();
+        assert_eq!(count, 2);
+        assert!(board.tasks[0].deleted_at.is_none());
+        assert!(board.tasks[1].deleted_at.is_some());
+        assert!(board.tasks[2].deleted_at.is_some());
+    }
+
+    #[test]
+    fn active_tasks_excludes_deleted() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 3,
+            tasks: vec![
+                make_task(1, TaskStatus::Todo),
+                make_task(2, TaskStatus::Todo),
+            ],
+        };
+
+        board.soft_delete(1);
+        assert_eq!(board.active_tasks().len(), 1);
+        assert_eq!(board.active_tasks()[0].id, 2);
+    }
+
+    #[test]
+    fn deleted_tasks_returns_only_deleted() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 3,
+            tasks: vec![
+                make_task(1, TaskStatus::Todo),
+                make_task(2, TaskStatus::Todo),
+            ],
+        };
+
+        board.soft_delete(1);
+        assert_eq!(board.deleted_tasks().len(), 1);
+        assert_eq!(board.deleted_tasks()[0].id, 1);
+    }
+
+    #[test]
+    fn move_task_skips_deleted_tasks() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 2,
+            tasks: vec![make_task(1, TaskStatus::Todo)],
+        };
+
+        board.soft_delete(1);
+        assert!(!board.move_task(1, TaskStatus::Done));
     }
 
     #[test]

@@ -12,10 +12,7 @@ impl RemoveCommand {
     pub fn run(&self) -> Result<()> {
         let mut board = Board::load()?;
 
-        let initial_len = board.tasks.len();
-        board.tasks.retain(|t| t.id != self.id);
-
-        if board.tasks.len() < initial_len {
+        if board.soft_delete(self.id) {
             board.save()?;
             tracing::info!("Task {} removed", self.id);
         } else {
@@ -42,6 +39,7 @@ mod tests {
             status: TaskStatus::Todo,
             created_at: Utc::now(),
             transitions: vec![],
+            deleted_at: None,
         }
     }
 
