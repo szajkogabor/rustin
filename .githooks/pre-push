@@ -4,11 +4,12 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-echo "[pre-commit] Running cargo fmt check..."
+echo "[pre-push] Running cargo fmt check..."
 cargo fmt --all -- --check
 
-echo "[pre-commit] Running cargo clippy..."
+echo "[pre-push] Running cargo clippy..."
 cargo clippy --all-targets --all-features -- -D warnings
 
-echo "[pre-commit] Running cargo test..."
+echo "[pre-push] Running cargo test..."
 cargo test --all-targets --all-features
+
