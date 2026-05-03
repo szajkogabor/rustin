@@ -550,6 +550,28 @@ fn show_displays_status_history_after_transitions() {
 }
 
 #[test]
+fn show_displays_timestamps_in_local_time_not_utc() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir).args(["add", "Task"]).assert().success();
+    let output = cmd(&dir)
+        .args(["show", "1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(
+        text.contains("Created:"),
+        "expected Created field, got:\n{text}"
+    );
+    assert!(
+        !text.contains("UTC"),
+        "timestamps should be local, not UTC, got:\n{text}"
+    );
+}
+
+#[test]
 fn show_status_label_inprogress_is_human_readable() {
     let dir = TempDir::new().unwrap();
     cmd(&dir).args(["add", "Active task"]).assert().success();

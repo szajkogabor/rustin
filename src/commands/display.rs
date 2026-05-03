@@ -1,4 +1,5 @@
 use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
+use chrono::{DateTime, Local, Utc};
 use clap::ValueEnum;
 use console::measure_text_width;
 use std::cmp::Ordering;
@@ -191,6 +192,11 @@ pub(crate) fn split_tasks(tasks: &[Task]) -> TaskColumns {
     columns
 }
 
+pub(crate) fn format_local_timestamp(utc: &DateTime<Utc>) -> String {
+    let local: DateTime<Local> = utc.with_timezone(&Local);
+    local.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
     let mut lines = vec![
         format!("ID:          {}", task.id),
@@ -202,10 +208,7 @@ pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
             priority_emoji(task.priority)
         ),
         format!("Status:      {}", status_label(&task.status)),
-        format!(
-            "Created:     {}",
-            task.created_at.format("%Y-%m-%d %H:%M:%S UTC")
-        ),
+        format!("Created:     {}", format_local_timestamp(&task.created_at)),
     ];
 
     if let Some(desc) = &task.description {
@@ -218,7 +221,7 @@ pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
                 "  {} → {}  ({})",
                 status_label(&transition.from),
                 status_label(&transition.to),
-                transition.at.format("%Y-%m-%d %H:%M:%S UTC")
+                format_local_timestamp(&transition.at)
             ));
         }
     }
@@ -229,8 +232,9 @@ pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        TaskColumn, build_task_table_rows, format_task, kind_emoji, priority_emoji, split_tasks,
-        status_label, task_detail_lines, task_order, task_snapshot_lines, visible_task_columns,
+        TaskColumn, build_task_table_rows, format_local_timestamp, format_task, kind_emoji,
+        priority_emoji, split_tasks, status_label, task_detail_lines, task_order,
+        task_snapshot_lines, visible_task_columns,
     };
     use crate::store::{StatusTransition, Task, TaskKind, TaskPriority, TaskStatus};
     use chrono::{Duration, TimeZone, Utc};
@@ -380,6 +384,8 @@ mod tests {
 
     #[test]
     fn task_detail_lines_include_description_and_history() {
+        let created = Utc.with_ymd_and_hms(2024, 1, 1, 9, 0, 0).unwrap();
+        let transitioned = Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap();
         let task = Task {
             id: 7,
             title: "Investigate bug".to_string(),
@@ -387,11 +393,11 @@ mod tests {
             kind: TaskKind::Bug,
             description: Some("Collect logs".to_string()),
             status: TaskStatus::Done,
-            created_at: Utc.with_ymd_and_hms(2024, 1, 1, 9, 0, 0).unwrap(),
+            created_at: created,
             transitions: vec![StatusTransition {
                 from: TaskStatus::InProgress,
                 to: TaskStatus::Done,
-                at: Utc.with_ymd_and_hms(2024, 1, 1, 10, 0, 0).unwrap(),
+                at: transitioned,
             }],
         };
 
@@ -407,10 +413,37 @@ mod tests {
                 .any(|line| line.contains("Description: Collect logs"))
         );
         assert!(lines.iter().any(|line| line.contains("History:")));
+
+        let expected_transition_time = format_local_timestamp(&transitioned);
+        assert!(lines.iter().any(|line| line.contains(&format!(
+            "In Progress → Done  ({})",
+            expected_transition_time
+        ))));
+
+        let expected_created_time = format_local_timestamp(&created);
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains("In Progress → Done  (2024-01-01 10:00:00 UTC)"))
+                .any(|line| line.contains(&format!("Created:     {}", expected_created_time)))
         );
+    }
+
+    #[test]
+    fn format_local_timestamp_converts_utc_to_local() {
+        let utc = Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+        let formatted = format_local_timestamp(&utc);
+
+        // Must not contain "UTC" — it's local time now
+        assert!(!formatted.contains("UTC"));
+        // Must match YYYY-MM-DD HH:MM:SS pattern (19 chars)
+        assert_eq!(formatted.len(), 19);
+
+        // Verify round-trip: the local rendering matches chrono Local conversion
+        use chrono::Local;
+        let expected = utc
+            .with_timezone(&Local)
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        assert_eq!(formatted, expected);
     }
 }
