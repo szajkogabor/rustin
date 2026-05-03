@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0-rc.4",
+  "title": "rustin",
+  "next_id": 4,
+  "tasks": [
+    {
+      "id": 1,
+      "title": "tui add, edit and remove functions",
+      "priority": "medium",
+      "kind": "feature",
+      "description": "tui view should have add, edit and remove commands. it should show a dialog to ask for task fields. tab to navigate between input fields and buttons",
+      "status": "todo",
+      "created_at": "2026-05-03T12:53:42.544522Z",
+      "transitions": []
+    },
+    {
+      "id": 2,
+      "title": "task date should be saved as utc, but showed as user local time",
+      "priority": "medium",
+      "kind": "bug",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-05-03T12:54:16.360187Z",
+      "transitions": []
+    },
+    {
+      "id": 3,
+      "title": "tui commands to change priority",
+      "priority": "medium",
+      "kind": "feature",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-05-03T12:54:33.500259Z",
+      "transitions": []
+    }
+  ]
+}
