@@ -211,6 +211,16 @@ fn add_with_chore_kind_shows_wrench_emoji() {
 }
 
 #[test]
+fn add_with_ci_kind_shows_gear_emoji() {
+    let dir = TempDir::new().unwrap();
+    cmd(&dir)
+        .args(["add", "Fix pipeline", "-k", "ci"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("⚙️"));
+}
+
+#[test]
 fn add_default_kind_is_feature_with_sparkle_emoji() {
     let dir = TempDir::new().unwrap();
     cmd(&dir)

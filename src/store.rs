@@ -49,6 +49,7 @@ pub enum TaskKind {
     Feature,
     Bug,
     Chore,
+    Ci,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -326,6 +327,13 @@ mod tests {
         let json = r#"{"title":"MyBoard","next_id":1,"tasks":[]}"#;
         let board: Board = serde_json::from_str(json).unwrap();
         assert_eq!(board.version, "0.0.0");
+    }
+
+    #[test]
+    fn task_deserializes_ci_kind() {
+        let json = r#"{"id":1,"title":"t","kind":"ci","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.kind, TaskKind::Ci);
     }
 
     #[test]

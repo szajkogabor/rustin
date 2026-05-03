@@ -92,5 +92,7 @@ mod tests {
         assert_ne!(TaskKind::Feature, TaskKind::Bug);
         assert_ne!(TaskKind::Bug, TaskKind::Chore);
         assert_ne!(TaskKind::Feature, TaskKind::Chore);
+        assert_ne!(TaskKind::Feature, TaskKind::Ci);
+        assert_ne!(TaskKind::Ci, TaskKind::Bug);
     }
 }

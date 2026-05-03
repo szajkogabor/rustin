@@ -145,6 +145,7 @@ pub(crate) fn kind_emoji(kind: TaskKind) -> String {
         TaskKind::Feature => "✨",
         TaskKind::Bug => "🐛",
         TaskKind::Chore => "🔧",
+        TaskKind::Ci => "⚙️",
     };
     pad_to_width(emoji, 2)
 }
@@ -283,6 +284,7 @@ mod tests {
         assert_eq!(kind_emoji(TaskKind::Feature), "✨");
         assert_eq!(kind_emoji(TaskKind::Bug), "🐛");
         assert_eq!(kind_emoji(TaskKind::Chore), "🔧");
+        assert_eq!(kind_emoji(TaskKind::Ci), "⚙️");
     }
 
     #[test]
