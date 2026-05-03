@@ -21,6 +21,7 @@ time = { version = "0.3.47", features = ["macros", "formatting"] }
 tracing = "0.1.41"
 tracing-indicatif = "0.3.14"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "time"] }
+console = "0.16.3"
 
 [dev-dependencies]
 assert_cmd = "2"

@@ -1,253 +1,279 @@
-use crate::commands::display::{kind_emoji, priority_emoji};
-use crate::store::{Board, Task, TaskStatus};
-use clap::{Args, ValueEnum};
-use std::cmp::Ordering;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum Column {
-    Todo,
-    Inprogress,
-    Done,
-}
+use crate::commands::display::{
+    TaskColumn, TaskColumns, build_task_table_rows, split_tasks, visible_task_columns,
+};
+use crate::store::Board;
+use anyhow::Context;
+use clap::Args;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
+use ratatui::backend::CrosstermBackend;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, Widget};
+use ratatui::{Frame, Terminal, TerminalOptions, Viewport};
+use std::io::{self, IsTerminal, Stdout};
 
 #[derive(Args)]
 pub struct ListCommand {
     /// Columns to display (default: all)
     #[arg(short, long, value_enum, num_args = 1..)]
-    pub columns: Vec<Column>,
+    pub columns: Vec<TaskColumn>,
 }
 
 impl ListCommand {
     pub fn run(&self) -> anyhow::Result<()> {
-        let show_all = self.columns.is_empty();
-        let show = |col: Column| show_all || self.columns.contains(&col);
-
         let board = Board::load()?;
+        let view = ListView::from_board(&board, &self.columns);
 
-        let mut todos: Vec<_> = board
-            .tasks
-            .iter()
-            .filter(|t| t.status == TaskStatus::Todo)
-            .collect();
-        let mut in_progress: Vec<_> = board
-            .tasks
-            .iter()
-            .filter(|t| t.status == TaskStatus::InProgress)
-            .collect();
-        let mut done: Vec<_> = board
-            .tasks
-            .iter()
-            .filter(|t| t.status == TaskStatus::Done)
-            .collect();
-
-        todos.sort_by(task_order);
-        in_progress.sort_by(task_order);
-        done.sort_by(task_order);
-
-        let todos: Vec<(String, String)> = todos.iter().map(format_task).collect();
-        let in_progress: Vec<(String, String)> = in_progress.iter().map(format_task).collect();
-        let done: Vec<(String, String)> = done.iter().map(format_task).collect();
-
-        println!("=== {} ===", board.title);
-
-        let todo_col = show(Column::Todo).then_some(todos.as_slice());
-        let inprogress_col = show(Column::Inprogress).then_some(in_progress.as_slice());
-        let done_col = show(Column::Done).then_some(done.as_slice());
-
-        let total = todo_col.map_or(0, |c| c.len())
-            + inprogress_col.map_or(0, |c| c.len())
-            + done_col.map_or(0, |c| c.len());
-
-        if total == 0 && board.tasks.is_empty() {
-            println!("The board is empty. Add a task with `rustin add \"Task title\"`");
+        if io::stdout().is_terminal() {
+            let mut terminal = InlineListTerminal::enter(view.viewport_height())?;
+            terminal.draw(|frame| view.render(frame))?;
         } else {
-            print_columns(todo_col, inprogress_col, done_col);
+            println!("{}", view.render_to_string(terminal_width()));
         }
 
         Ok(())
     }
 }
 
-fn print_columns(
-    todo: Option<&[(String, String)]>,
-    in_progress: Option<&[(String, String)]>,
-    done: Option<&[(String, String)]>,
-) {
-    // Build the list of active columns: (header, rows)
-    let mut cols: Vec<(&str, &[(String, String)])> = Vec::new();
-    if let Some(rows) = todo {
-        cols.push(("Todo", rows));
-    }
-    if let Some(rows) = in_progress {
-        cols.push(("In Progress", rows));
-    }
-    if let Some(rows) = done {
-        cols.push(("Done", rows));
-    }
-
-    if cols.is_empty() {
-        return;
-    }
-
-    // Fit within terminal width
-    let separators = " | ".len() * cols.len().saturating_sub(1);
-    let term_width = terminal_width();
-    let available = term_width.saturating_sub(separators);
-    let col_cap = (available / cols.len()).max(10);
-
-    let widths: Vec<usize> = cols
-        .iter()
-        .map(|(header, rows)| {
-            rows.iter()
-                .map(|(main, suffix)| {
-                    main.chars().count()
-                        + if suffix.is_empty() {
-                            0
-                        } else {
-                            1 + suffix.chars().count()
-                        }
-                })
-                .max()
-                .unwrap_or(0)
-                .max(header.len())
-                .min(col_cap)
-        })
-        .collect();
-
-    // Header row
-    let header_parts: Vec<String> = cols
-        .iter()
-        .zip(widths.iter())
-        .map(|((header, _), w)| format!("{:w$}", truncate(header, *w)))
-        .collect();
-    println!("{}", header_parts.join(" | "));
-
-    // Data rows
-    let max_rows = cols.iter().map(|(_, rows)| rows.len()).max().unwrap_or(0);
-    for i in 0..max_rows {
-        let row_parts: Vec<String> = cols
-            .iter()
-            .zip(widths.iter())
-            .map(|((_, rows), w)| {
-                let (main, suffix) = rows
-                    .get(i)
-                    .map_or(("", ""), |(m, s)| (m.as_str(), s.as_str()));
-                let suffix_chars = if suffix.is_empty() {
-                    0
-                } else {
-                    1 + suffix.chars().count()
-                };
-                let main_budget = w.saturating_sub(suffix_chars);
-                let cell = if suffix.is_empty() {
-                    truncate(main, *w)
-                } else {
-                    format!("{} {}", truncate(main, main_budget), suffix)
-                };
-                format!("{:w$}", cell)
-            })
-            .collect();
-        println!("{}", row_parts.join(" | "));
-    }
+struct InlineListTerminal {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
 }
 
-fn terminal_width() -> usize {
-    // COLUMNS env var is set by most shells; fall back to a safe default
-    if let Ok(val) = std::env::var("COLUMNS")
-        && let Ok(n) = val.parse::<usize>()
+impl InlineListTerminal {
+    fn enter(height: u16) -> anyhow::Result<Self> {
+        enable_raw_mode().context("failed to enable raw mode for inline list rendering")?;
+        let backend = CrosstermBackend::new(io::stdout());
+        let terminal = Terminal::with_options(
+            backend,
+            TerminalOptions {
+                viewport: Viewport::Inline(height),
+            },
+        )
+        .context("failed to initialize inline list terminal")?;
+
+        Ok(Self { terminal })
+    }
+
+    fn draw<F>(&mut self, render: F) -> anyhow::Result<()>
+    where
+        F: FnOnce(&mut Frame),
     {
-        return n;
-    }
-    120
-}
-
-/// Truncate `s` to at most `max` visible chars, appending `…` if cut.
-fn truncate(s: &str, max: usize) -> String {
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() <= max {
-        s.to_string()
-    } else {
-        let cut = max.saturating_sub(1);
-        chars[..cut].iter().collect::<String>() + "…"
+        self.terminal.draw(render)?;
+        Ok(())
     }
 }
 
-fn format_task(t: &&Task) -> (String, String) {
-    let main = format!("{} [{}] {}", priority_emoji(t.priority), t.id, t.title);
-    let suffix = kind_emoji(t.kind).to_string();
-    (main, suffix)
+impl Drop for InlineListTerminal {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let _ = self.terminal.show_cursor();
+    }
 }
 
-pub(crate) fn task_order(left: &&Task, right: &&Task) -> Ordering {
-    right
-        .priority
-        .cmp(&left.priority)
-        .then_with(|| left.created_at.cmp(&right.created_at))
-        .then_with(|| left.id.cmp(&right.id))
+#[derive(Debug)]
+struct ListView {
+    title: String,
+    columns: TaskColumns,
+    visible_columns: Vec<TaskColumn>,
+    is_empty: bool,
+}
+
+impl ListView {
+    fn from_board(board: &Board, selected_columns: &[TaskColumn]) -> Self {
+        Self {
+            title: board.title.clone(),
+            columns: split_tasks(&board.tasks),
+            visible_columns: visible_task_columns(selected_columns),
+            is_empty: board.tasks.is_empty(),
+        }
+    }
+
+    fn viewport_height(&self) -> u16 {
+        1 + self.content_height()
+    }
+
+    fn render(&self, frame: &mut Frame) {
+        let [title_area, content_area] = split_layout(frame.area(), self.content_height());
+        frame.render_widget(Paragraph::new(self.title_line()), title_area);
+
+        if self.is_empty {
+            frame.render_widget(self.empty_widget(), content_area);
+        } else {
+            frame.render_widget(self.table_widget(), content_area);
+        }
+    }
+
+    fn render_to_string(&self, width: u16) -> String {
+        let area = Rect::new(0, 0, width.max(20), self.viewport_height());
+        let mut buffer = Buffer::empty(area);
+        let [title_area, content_area] = split_layout(area, self.content_height());
+
+        Paragraph::new(self.title_line()).render(title_area, &mut buffer);
+        if self.is_empty {
+            self.empty_widget().render(content_area, &mut buffer);
+        } else {
+            self.table_widget().render(content_area, &mut buffer);
+        }
+
+        buffer_to_string(&buffer)
+    }
+
+    fn content_height(&self) -> u16 {
+        if self.is_empty {
+            3
+        } else {
+            self.columns.max_rows(&self.visible_columns) as u16 + 3
+        }
+    }
+
+    fn title_line(&self) -> String {
+        format!("=== {} ===", self.title)
+    }
+
+    fn empty_widget(&self) -> Paragraph<'static> {
+        Paragraph::new("The board is empty. Add a task with `rustin add \"Task title\"`")
+            .block(Block::default().borders(Borders::ALL))
+    }
+
+    fn table_widget(&self) -> Table<'static> {
+        let rows = build_task_table_rows(&self.columns, &self.visible_columns)
+            .into_iter()
+            .map(Row::new)
+            .collect::<Vec<_>>();
+        let widths = vec![
+            Constraint::Ratio(1, self.visible_columns.len() as u32);
+            self.visible_columns.len()
+        ];
+        let header = Row::new(
+            self.visible_columns
+                .iter()
+                .map(|column| column.title())
+                .collect::<Vec<_>>(),
+        )
+        .style(Style::default().add_modifier(Modifier::BOLD));
+
+        Table::new(rows, widths)
+            .header(header)
+            .column_spacing(1)
+            .block(Block::default().borders(Borders::ALL))
+    }
+}
+
+fn split_layout(area: Rect, content_height: u16) -> [Rect; 2] {
+    let sections = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(content_height)])
+        .split(area);
+
+    [sections[0], sections[1]]
+}
+
+fn terminal_width() -> u16 {
+    size()
+        .map(|(width, _)| width)
+        .or_else(|_| {
+            std::env::var("COLUMNS")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .ok_or_else(|| std::io::Error::other("missing COLUMNS"))
+        })
+        .unwrap_or(120)
+}
+
+fn buffer_to_string(buffer: &Buffer) -> String {
+    (0..buffer.area.height)
+        .map(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{format_task, task_order, truncate};
-    use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
-    use chrono::{Duration, Utc};
+    use super::ListView;
+    use crate::commands::display::TaskColumn;
+    use crate::store::{Board, Task, TaskKind, TaskPriority, TaskStatus};
+    use chrono::Utc;
 
-    fn make_task(id: u32, priority: TaskPriority, created_at: chrono::DateTime<Utc>) -> Task {
+    fn board_with_tasks(tasks: Vec<Task>) -> Board {
+        Board {
+            title: "Board".to_string(),
+            next_id: tasks.len() as u32 + 1,
+            tasks,
+            ..Board::default()
+        }
+    }
+
+    fn task(id: u32, title: &str, status: TaskStatus) -> Task {
         Task {
             id,
-            title: format!("task-{id}"),
-            priority,
+            title: title.to_string(),
+            priority: TaskPriority::Medium,
             kind: TaskKind::Feature,
             description: None,
-            status: TaskStatus::Todo,
-            created_at,
+            status,
+            created_at: Utc::now(),
             transitions: vec![],
         }
     }
 
     #[test]
-    fn task_order_sorts_by_priority_then_date_then_id() {
-        let now = Utc::now();
-        let mut tasks = vec![
-            make_task(3, TaskPriority::Medium, now - Duration::minutes(10)),
-            make_task(2, TaskPriority::High, now - Duration::minutes(5)),
-            make_task(1, TaskPriority::High, now - Duration::minutes(5)),
-            make_task(4, TaskPriority::Low, now - Duration::minutes(20)),
-        ];
+    fn render_to_string_shows_board_title_and_table_headers() {
+        let view = ListView::from_board(
+            &board_with_tasks(vec![task(1, "Write tests", TaskStatus::Todo)]),
+            &[],
+        );
 
-        tasks.sort_by(|left, right| task_order(&left, &right));
+        let rendered = view.render_to_string(80);
 
-        let ids: Vec<u32> = tasks.into_iter().map(|task| task.id).collect();
-        assert_eq!(ids, vec![1, 2, 3, 4]);
+        assert!(rendered.contains("=== Board ==="));
+        assert!(rendered.contains("Todo"));
+        assert!(rendered.contains("In Progress"));
+        assert!(rendered.contains("Done"));
+        assert!(rendered.contains("Write tests"));
     }
 
     #[test]
-    fn truncate_keeps_short_string_unchanged() {
-        assert_eq!(truncate("hello", 10), "hello");
-        assert_eq!(truncate("hello", 5), "hello");
+    fn render_to_string_honors_selected_columns() {
+        let view = ListView::from_board(
+            &board_with_tasks(vec![task(1, "Ship it", TaskStatus::Done)]),
+            &[TaskColumn::Done],
+        );
+
+        let rendered = view.render_to_string(80);
+
+        assert!(!rendered.contains("Todo │"));
+        assert!(!rendered.contains("In Progress"));
+        assert!(rendered.contains("Done"));
+        assert!(rendered.contains("Ship it"));
     }
 
     #[test]
-    fn truncate_cuts_long_string_with_ellipsis() {
-        assert_eq!(truncate("hello world", 7), "hello …");
-        assert_eq!(truncate("abcdef", 4), "abc…");
+    fn render_to_string_shows_empty_message() {
+        let view = ListView::from_board(&board_with_tasks(vec![]), &[]);
+
+        let rendered = view.render_to_string(80);
+
+        assert!(rendered.contains("=== Board ==="));
+        assert!(rendered.contains("The board is empty"));
     }
 
     #[test]
-    fn format_task_produces_correct_parts() {
-        let now = Utc::now();
-        let task = make_task(42, TaskPriority::High, now);
-        let task_ref = &task;
-        let (main, suffix) = format_task(&task_ref);
-        assert_eq!(main, "🔥 [42] task-42");
-        assert_eq!(suffix, "✨");
-    }
+    fn viewport_height_accounts_for_title_and_table_rows() {
+        let view = ListView::from_board(
+            &board_with_tasks(vec![
+                task(1, "One", TaskStatus::Todo),
+                task(2, "Two", TaskStatus::Done),
+            ]),
+            &[],
+        );
 
-    #[test]
-    fn format_task_bug_kind_produces_bug_emoji() {
-        let now = Utc::now();
-        let mut task = make_task(1, TaskPriority::Low, now);
-        task.kind = TaskKind::Bug;
-        let (_, suffix) = format_task(&&task);
-        assert_eq!(suffix, "🐛");
+        assert_eq!(view.viewport_height(), 5);
     }
 }

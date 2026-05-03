@@ -1,7 +1,7 @@
-use crate::commands::display::{kind_emoji, priority_emoji, status_label};
-use crate::commands::list::task_order;
-use crate::commands::show::task_detail_lines;
-use crate::store::{Board, Task, TaskStatus};
+use crate::commands::display::{
+    TaskColumn, TaskColumns, split_tasks, status_label, task_detail_lines, task_snapshot_lines,
+};
+use crate::store::{Board, TaskStatus};
 use anyhow::Context;
 use clap::Args;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -12,7 +12,7 @@ use crossterm::terminal::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 use std::io::{self, Stdout};
@@ -92,73 +92,13 @@ impl Drop for TerminalSession {
     }
 }
 
-#[derive(Clone)]
-struct TaskRow {
-    id: u32,
-    title: String,
-    priority: String,
-    kind: String,
-    status: String,
-    description: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TaskColumn {
-    Todo,
-    InProgress,
-    Done,
-}
-
-impl TaskColumn {
-    const ALL: [TaskColumn; 3] = [TaskColumn::Todo, TaskColumn::InProgress, TaskColumn::Done];
-
-    fn title(self) -> &'static str {
-        match self {
-            TaskColumn::Todo => "Todo",
-            TaskColumn::InProgress => "In Progress",
-            TaskColumn::Done => "Done",
-        }
-    }
-
-    fn next(self) -> Self {
-        match self {
-            TaskColumn::Todo => TaskColumn::InProgress,
-            TaskColumn::InProgress => TaskColumn::Done,
-            TaskColumn::Done => TaskColumn::Todo,
-        }
-    }
-
-    fn previous(self) -> Self {
-        match self {
-            TaskColumn::Todo => TaskColumn::Done,
-            TaskColumn::InProgress => TaskColumn::Todo,
-            TaskColumn::Done => TaskColumn::InProgress,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Selection {
     column: TaskColumn,
     index: usize,
 }
 
-#[derive(Default)]
-struct TaskColumns {
-    todo: Vec<TaskRow>,
-    in_progress: Vec<TaskRow>,
-    done: Vec<TaskRow>,
-}
-
 impl TaskColumns {
-    fn tasks(&self, column: TaskColumn) -> &[TaskRow] {
-        match column {
-            TaskColumn::Todo => &self.todo,
-            TaskColumn::InProgress => &self.in_progress,
-            TaskColumn::Done => &self.done,
-        }
-    }
-
     fn first_selection(&self) -> Option<Selection> {
         TaskColumn::ALL
             .into_iter()
@@ -391,18 +331,8 @@ impl App {
         let detail_lines = self
             .selected
             .and_then(|selection| self.columns.tasks(selection.column).get(selection.index))
-            .map(|task| {
-                vec![
-                    Line::from(format!("Task: [{}] {}", task.id, task.title)),
-                    Line::from(format!("Status: {}", task.status)),
-                    Line::from(format!("Priority: {}", task.priority)),
-                    Line::from(format!("Kind: {}", task.kind)),
-                    Line::from(format!(
-                        "Description: {}",
-                        task.description.as_deref().unwrap_or("(none)")
-                    )),
-                ]
-            })
+            .map(task_snapshot_lines)
+            .map(|lines| lines.into_iter().map(Line::from).collect())
             .unwrap_or_else(|| vec![Line::from("No task selected.")]);
 
         let details = Paragraph::new(detail_lines).block(
@@ -426,12 +356,7 @@ impl App {
             .columns
             .tasks(column)
             .iter()
-            .map(|task| {
-                ListItem::new(Line::from(vec![
-                    Span::raw(format!("{} [{}] {}", task.priority, task.id, task.title)),
-                    Span::styled(format!(" {}", task.kind), Style::default().fg(Color::Cyan)),
-                ]))
-            })
+            .map(|task| ListItem::new(task.summary.clone()))
             .collect();
 
         let is_active = self
@@ -505,42 +430,20 @@ fn centered_rect(
         .split(vertical[1])[1]
 }
 
-fn split_tasks(tasks: &[Task]) -> TaskColumns {
-    let mut ordered: Vec<&Task> = tasks.iter().collect();
-    ordered.sort_by(task_order);
-
-    let mut columns = TaskColumns::default();
-
-    for task in ordered {
-        let row = TaskRow {
-            id: task.id,
-            title: task.title.clone(),
-            priority: priority_emoji(task.priority).to_string(),
-            kind: kind_emoji(task.kind).to_string(),
-            status: status_label(&task.status).to_string(),
-            description: task.description.clone(),
-        };
-
-        match task.status {
-            TaskStatus::Todo => columns.todo.push(row),
-            TaskStatus::InProgress => columns.in_progress.push(row),
-            TaskStatus::Done => columns.done.push(row),
-        }
-    }
-
-    columns
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{App, Selection, TaskColumn, TaskColumns, TaskRow};
+    use super::{App, Selection};
+    use crate::commands::display::{TaskColumn, TaskColumns, TaskRow, format_task, split_tasks};
+    use crate::store::{Task, TaskKind, TaskPriority, TaskStatus};
+    use chrono::Utc;
 
     fn row(id: u32, status: &str) -> TaskRow {
         TaskRow {
             id,
+            summary: format!("[{id:>2}] sample"),
             title: format!("task-{id}"),
-            priority: "🌶️".to_string(),
-            kind: "✨".to_string(),
+            priority: "~".to_string(),
+            kind: "+".to_string(),
             status: status.to_string(),
             description: None,
         }
@@ -675,5 +578,25 @@ mod tests {
         let mut app = app_with_columns(columns(&[], &[], &[]), None);
         app.move_selected(crate::store::TaskStatus::Done).unwrap();
         assert_eq!(app.status_line, "No task selected.");
+    }
+
+    #[test]
+    fn split_tasks_uses_shared_list_formatter_for_summary() {
+        let task = Task {
+            id: 7,
+            title: "reuse formatter".to_string(),
+            priority: TaskPriority::High,
+            kind: TaskKind::Bug,
+            description: Some("details".to_string()),
+            status: TaskStatus::Todo,
+            created_at: Utc::now(),
+            transitions: vec![],
+        };
+
+        let columns = split_tasks(std::slice::from_ref(&task));
+
+        assert_eq!(columns.todo[0].summary, format_task(&task));
+        assert_eq!(columns.todo[0].priority, "🔥");
+        assert_eq!(columns.todo[0].kind, "🐛");
     }
 }

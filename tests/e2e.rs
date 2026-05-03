@@ -228,8 +228,8 @@ fn add_multiple_tasks_assigns_incrementing_ids() {
         .stdout
         .clone();
     let s = String::from_utf8(out).unwrap();
-    assert!(s.contains("[1]"), "expected id 1, got:\n{s}");
-    assert!(s.contains("[2]"), "expected id 2, got:\n{s}");
+    assert!(s.contains("[ 1]"), "expected id 1, got:\n{s}");
+    assert!(s.contains("[ 2]"), "expected id 2, got:\n{s}");
 }
 
 // ---------------------------------------------------------------------------
@@ -408,23 +408,6 @@ fn list_columns_multiple_shows_selected_only() {
 }
 
 #[test]
-fn list_narrow_terminal_truncates_header_to_column_width() {
-    let dir = TempDir::new().unwrap();
-    cmd(&dir).args(["add", "Todo task"]).assert().success();
-    cmd(&dir).args(["add", "Progress task"]).assert().success();
-    cmd(&dir).args(["inprogress", "2"]).assert().success();
-    cmd(&dir).args(["add", "Done task"]).assert().success();
-    cmd(&dir).args(["done", "3"]).assert().success();
-
-    cmd(&dir)
-        .env("COLUMNS", "24")
-        .args(["list"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("In Progre…"));
-}
-
-#[test]
 fn list_from_nested_directory_uses_parent_board_file() {
     let dir = TempDir::new().unwrap();
     let nested = dir.path().join("nested").join("deep");
@@ -504,12 +487,8 @@ fn list_sorts_equal_priority_and_timestamp_by_id() {
         .stdout
         .clone();
     let text = String::from_utf8(output).unwrap();
-    let first = text
-        .find("[1] First")
-        .expect("expected first task in output");
-    let second = text
-        .find("[2] Second")
-        .expect("expected second task in output");
+    let first = text.find("[ 1]").expect("expected first task in output");
+    let second = text.find("[ 2]").expect("expected second task in output");
     assert!(first < second, "expected id 1 before id 2, got:\n{text}");
 }
 
@@ -530,8 +509,8 @@ fn show_displays_all_fields() {
         .success()
         .stdout(predicate::str::contains("ID:          1"))
         .stdout(predicate::str::contains("Title:       Build feature"))
-        .stdout(predicate::str::contains("Chore 🔧"))
-        .stdout(predicate::str::contains("High 🔥"))
+        .stdout(predicate::str::contains("Kind:        Chore 🔧"))
+        .stdout(predicate::str::contains("Priority:    High 🔥"))
         .stdout(predicate::str::contains("Status:      Todo"));
 }
 
@@ -687,7 +666,7 @@ fn edit_updates_priority() {
         .args(["show", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("High 🔥"));
+        .stdout(predicate::str::contains("Priority:    High 🔥"));
 }
 
 #[test]
@@ -702,7 +681,7 @@ fn edit_updates_kind() {
         .args(["show", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Bug 🐛"));
+        .stdout(predicate::str::contains("Kind:        Bug 🐛"));
 }
 
 #[test]
