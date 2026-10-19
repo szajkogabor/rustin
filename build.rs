@@ -1,9 +1,11 @@
 use anyhow::Result;
 use vergen::Emitter;
-use vergen_git2::Git2Builder;
 
 pub fn main() -> Result<()> {
-    let git2 = Git2Builder::default().describe(true, false, None).build()?;
-    Emitter::default().add_instructions(&git2)?.emit()?;
+    let describe = vergen_git2::Git2::builder()
+        .describe(true, true, None)
+        .build();
+
+    Emitter::default().add_instructions(&describe)?.emit()?;
     Ok(())
 }
