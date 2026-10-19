@@ -489,11 +489,21 @@ impl App {
     }
 
     fn render(&self, frame: &mut Frame) {
+        let detail_lines: Vec<Line> = self
+            .selected
+            .and_then(|selection| self.columns.tasks(selection.column).get(selection.index))
+            .map(task_snapshot_lines)
+            .map(|lines| lines.into_iter().map(Line::from).collect())
+            .unwrap_or_else(|| vec![Line::from("No task selected.")]);
+        // Grow the details pane to fit the description, but keep room for the board.
+        let max_detail_height = frame.area().height.saturating_sub(10).max(6);
+        let detail_height = (detail_lines.len() as u16 + 2).clamp(6, max_detail_height);
+
         let areas = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(8),
-                Constraint::Length(6),
+                Constraint::Length(detail_height),
                 Constraint::Length(2),
             ])
             .split(frame.area());
@@ -515,18 +525,13 @@ impl App {
             self.render_column(frame, area, column);
         }
 
-        let detail_lines = self
-            .selected
-            .and_then(|selection| self.columns.tasks(selection.column).get(selection.index))
-            .map(task_snapshot_lines)
-            .map(|lines| lines.into_iter().map(Line::from).collect())
-            .unwrap_or_else(|| vec![Line::from("No task selected.")]);
-
-        let details = Paragraph::new(detail_lines).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!("{} details", self.title)),
-        );
+        let details = Paragraph::new(detail_lines)
+            .wrap(Wrap { trim: false })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!("{} details", self.title)),
+            );
         frame.render_widget(details, areas[1]);
 
         let footer =

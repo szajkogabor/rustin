@@ -119,16 +119,17 @@ pub(crate) fn build_task_table_rows(
 }
 
 pub(crate) fn task_snapshot_lines(task: &TaskRow) -> Vec<String> {
-    vec![
+    let mut lines = vec![
         format!("Task: [{}] {}", task.id, task.title),
         format!("Status: {}", task.status),
         format!("Priority: {}", task.priority),
         format!("Kind: {}", task.kind),
-        format!(
-            "Description: {}",
-            task.description.as_deref().unwrap_or("(none)")
-        ),
-    ]
+    ];
+    if let Some(desc) = task.description.as_deref().filter(|d| !d.trim().is_empty()) {
+        lines.push(String::new());
+        lines.extend(desc.lines().map(str::to_string));
+    }
+    lines
 }
 
 pub(crate) fn priority_emoji(priority: TaskPriority) -> String {
@@ -364,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn task_snapshot_lines_include_optional_description_placeholder() {
+    fn task_snapshot_lines_omit_missing_description() {
         let mut columns = split_tasks(&[sample_task()]);
         let row = columns.todo.remove(0);
         let lines = task_snapshot_lines(&row);
@@ -374,11 +375,19 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("Task: [42] Investigate formatter"))
         );
-        assert!(
-            lines
-                .iter()
-                .any(|line| line.contains("Description: (none)"))
-        );
+        assert_eq!(lines.len(), 4);
+    }
+
+    #[test]
+    fn task_snapshot_lines_append_description_at_bottom() {
+        let mut task = sample_task();
+        task.description = Some("Collect logs\nCheck config".to_string());
+        let mut columns = split_tasks(&[task]);
+        let row = columns.todo.remove(0);
+        let lines = task_snapshot_lines(&row);
+
+        assert_eq!(lines[lines.len() - 2], "Collect logs");
+        assert_eq!(lines[lines.len() - 1], "Check config");
     }
 
     #[test]
