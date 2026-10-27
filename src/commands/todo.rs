@@ -30,6 +30,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 

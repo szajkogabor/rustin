@@ -17,6 +17,10 @@ pub struct AddCommand {
     /// Optional description
     #[arg(short, long)]
     pub description: Option<String>,
+
+    /// Tag to attach (repeatable, stored uppercase)
+    #[arg(short, long = "tag")]
+    pub tags: Vec<String>,
 }
 
 use crate::store::{Board, Task, TaskStatus};
@@ -26,7 +30,7 @@ impl AddCommand {
     pub fn run(&self) -> Result<()> {
         let mut board = Board::load()?;
 
-        let task = Task {
+        let mut task = Task {
             id: board.next_id,
             title: self.title.clone(),
             priority: self.priority,
@@ -36,15 +40,25 @@ impl AddCommand {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         };
+        task.add_tags(&self.tags);
 
         board.next_id += 1;
         board.tasks.push(task.clone());
         board.save()?;
 
-        tracing::info!("Task added successfully: [{}] {}", task.id, task.title);
+        tracing::info!(
+            "Task added successfully: [{}] {}",
+            task.id,
+            task.display_title()
+        );
 
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
         Ok(())
     }
 }
@@ -65,6 +79,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 

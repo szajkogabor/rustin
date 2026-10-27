@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0-rc.4-8-g7721457",
+  "version": "1.0.1-dirty",
   "title": "rustin",
-  "next_id": 10,
+  "next_id": 12,
   "tasks": [
     {
       "id": 1,
@@ -18,7 +18,8 @@
           "at": "2026-05-03T13:42:38.600008Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 2,
@@ -35,7 +36,8 @@
           "at": "2026-05-03T13:42:41.350650Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 3,
@@ -52,7 +54,8 @@
           "at": "2026-05-03T13:42:49.379163Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 4,
@@ -74,7 +77,8 @@
           "at": "2026-05-03T13:51:42.419610Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 5,
@@ -96,7 +100,8 @@
           "at": "2026-05-03T13:51:50.457194Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 6,
@@ -118,7 +123,8 @@
           "at": "2026-05-03T13:51:51.692859Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 7,
@@ -140,7 +146,8 @@
           "at": "2026-05-03T13:51:52.994845Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 8,
@@ -162,7 +169,8 @@
           "at": "2026-05-03T13:59:47.598592Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
     },
     {
       "id": 9,
@@ -184,7 +192,37 @@
           "at": "2026-05-03T13:59:48.785610Z"
         }
       ],
-      "deleted_at": null
+      "deleted_at": null,
+      "tags": []
+    },
+    {
+      "id": 10,
+      "title": "hello",
+      "priority": "medium",
+      "kind": "feature",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-10-27T09:33:00.822588Z",
+      "transitions": [],
+      "deleted_at": "2026-10-27T09:34:07.337550Z",
+      "tags": [
+        "TEST1"
+      ]
+    },
+    {
+      "id": 11,
+      "title": "hello2",
+      "priority": "medium",
+      "kind": "feature",
+      "description": null,
+      "status": "todo",
+      "created_at": "2026-10-27T09:33:07.834775Z",
+      "transitions": [],
+      "deleted_at": "2026-10-27T09:34:09.914340Z",
+      "tags": [
+        "TEST1",
+        "TEST2"
+      ]
     }
   ]
 }

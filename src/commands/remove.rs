@@ -19,7 +19,11 @@ impl RemoveCommand {
             tracing::warn!("Task {} not found", self.id);
         }
 
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
         Ok(())
     }
 }
@@ -40,6 +44,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 

@@ -53,7 +53,11 @@ impl EditCommand {
 
         board.save()?;
 
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
         Ok(())
     }
 }

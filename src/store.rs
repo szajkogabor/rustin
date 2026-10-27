@@ -28,6 +28,67 @@ pub struct Task {
     pub transitions: Vec<StatusTransition>,
     #[serde(default)]
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+impl Task {
+    /// Title prefixed with the task's tags, e.g. `[UI,BUG] Fix button`.
+    pub fn display_title(&self) -> String {
+        if self.tags.is_empty() {
+            self.title.clone()
+        } else {
+            format!("[{}] {}", self.tags.join(","), self.title)
+        }
+    }
+
+    pub fn has_any_tag(&self, tags: &[String]) -> bool {
+        tags.iter()
+            .any(|tag| self.tags.contains(&normalize_tag(tag)))
+    }
+
+    /// Adds tags (normalized to uppercase), skipping empty ones and duplicates.
+    pub fn add_tags<I, S>(&mut self, tags: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        for tag in tags {
+            let tag = normalize_tag(tag.as_ref());
+            if !tag.is_empty() && !self.tags.contains(&tag) {
+                self.tags.push(tag);
+            }
+        }
+    }
+
+    /// Moves every `[a,b]` group in the title into tags. Returns true if anything changed.
+    pub fn migrate_title_tags(&mut self) -> bool {
+        let mut title = String::new();
+        let mut found = Vec::new();
+        let mut rest = self.title.as_str();
+
+        while let Some(start) = rest.find('[') {
+            let Some(len) = rest[start..].find(']') else {
+                break;
+            };
+            title.push_str(&rest[..start]);
+            found.extend(rest[start + 1..start + len].split(',').map(str::to_string));
+            rest = &rest[start + len + 1..];
+        }
+        title.push_str(rest);
+
+        if found.is_empty() {
+            return false;
+        }
+
+        self.title = title.split_whitespace().collect::<Vec<_>>().join(" ");
+        self.add_tags(found);
+        true
+    }
+}
+
+pub fn normalize_tag(tag: &str) -> String {
+    tag.trim().to_uppercase()
 }
 
 #[derive(
@@ -232,6 +293,14 @@ impl Board {
         count
     }
 
+    pub fn migrate_tags(&mut self) -> usize {
+        self.tasks
+            .iter_mut()
+            .map(|task| task.migrate_title_tags())
+            .filter(|changed| *changed)
+            .count()
+    }
+
     pub fn move_task(&mut self, id: u32, to: TaskStatus) -> bool {
         if let Some(task) = self
             .tasks
@@ -321,6 +390,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 
@@ -386,6 +456,73 @@ mod tests {
         let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
         let task: super::Task = serde_json::from_str(json).unwrap();
         assert!(task.deleted_at.is_none());
+    }
+
+    #[test]
+    fn task_deserializes_missing_tags_as_empty() {
+        let json = r#"{"id":1,"title":"t","status":"todo","created_at":"2024-01-01T00:00:00Z"}"#;
+        let task: super::Task = serde_json::from_str(json).unwrap();
+        assert!(task.tags.is_empty());
+    }
+
+    #[test]
+    fn add_tags_uppercases_and_deduplicates() {
+        let mut task = make_task(1, TaskStatus::Todo);
+        task.add_tags(["ui", " Bug ", "UI", ""]);
+        assert_eq!(task.tags, vec!["UI", "BUG"]);
+    }
+
+    #[test]
+    fn display_title_prefixes_tags() {
+        let mut task = make_task(1, TaskStatus::Todo);
+        assert_eq!(task.display_title(), "task-1");
+        task.add_tags(["ui", "bug"]);
+        assert_eq!(task.display_title(), "[UI,BUG] task-1");
+    }
+
+    #[test]
+    fn has_any_tag_matches_case_insensitively() {
+        let mut task = make_task(1, TaskStatus::Todo);
+        task.add_tags(["ui"]);
+        assert!(task.has_any_tag(&["Ui".to_string()]));
+        assert!(task.has_any_tag(&["cli".to_string(), "ui".to_string()]));
+        assert!(!task.has_any_tag(&["cli".to_string()]));
+    }
+
+    #[test]
+    fn migrate_title_tags_extracts_bracketed_groups() {
+        let mut task = make_task(1, TaskStatus::Todo);
+        task.title = "[ui, tui] Fix layout [bug]".to_string();
+        assert!(task.migrate_title_tags());
+        assert_eq!(task.title, "Fix layout");
+        assert_eq!(task.tags, vec!["UI", "TUI", "BUG"]);
+    }
+
+    #[test]
+    fn migrate_title_tags_leaves_plain_titles_untouched() {
+        let mut task = make_task(1, TaskStatus::Todo);
+        task.title = "No tags [here".to_string();
+        assert!(!task.migrate_title_tags());
+        assert_eq!(task.title, "No tags [here");
+        assert!(task.tags.is_empty());
+    }
+
+    #[test]
+    fn migrate_tags_counts_changed_tasks() {
+        let mut board = Board {
+            version: "0.0.0".to_string(),
+            title: "Board".to_string(),
+            next_id: 3,
+            tasks: vec![
+                make_task(1, TaskStatus::Todo),
+                make_task(2, TaskStatus::Done),
+            ],
+        };
+        board.tasks[1].title = "[cli] Something".to_string();
+
+        assert_eq!(board.migrate_tags(), 1);
+        assert_eq!(board.tasks[1].tags, vec!["CLI"]);
+        assert_eq!(board.tasks[1].title, "Something");
     }
 
     #[test]

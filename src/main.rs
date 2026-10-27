@@ -86,6 +86,8 @@ enum Commands {
     /// Restore a deleted task
     #[command(visible_alias = "ud")]
     Undelete(commands::undelete::UndeleteCommand),
+    /// Move `[tag1,tag2]` prefixes from task titles into tags
+    MigrateTags(commands::migrate_tags::MigrateTagsCommand),
 }
 
 fn main() -> Result<()> {
@@ -129,6 +131,7 @@ fn main() -> Result<()> {
         .command
         .unwrap_or(Commands::List(commands::list::ListCommand {
             columns: vec![],
+            tags: vec![],
         }));
 
     match command {
@@ -146,6 +149,7 @@ fn main() -> Result<()> {
         Commands::Archive(cmd) => cmd.run()?,
         Commands::Bin(cmd) => cmd.run()?,
         Commands::Undelete(cmd) => cmd.run()?,
+        Commands::MigrateTags(cmd) => cmd.run()?,
     }
 
     Ok(())

@@ -19,7 +19,11 @@ impl UndeleteCommand {
             tracing::warn!("Task {} not found in bin", self.id);
         }
 
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
         Ok(())
     }
 }

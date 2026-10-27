@@ -10,6 +10,7 @@ pub mod edit;
 pub mod init;
 pub mod inprogress;
 pub mod list;
+pub mod migrate_tags;
 pub mod remove;
 pub mod show;
 pub mod stat;
@@ -27,6 +28,10 @@ pub(crate) fn move_task_and_list(id: u32, to: TaskStatus, status_label: &str) ->
         tracing::warn!("Task {} not found", id);
     }
 
-    crate::commands::list::ListCommand { columns: vec![] }.run()?;
+    crate::commands::list::ListCommand {
+        columns: vec![],
+        tags: vec![],
+    }
+    .run()?;
     Ok(())
 }

@@ -26,7 +26,11 @@ impl InitCommand {
 
         save_local_board(&board_path, &mut board)?;
         maybe_offer_gitignore_entry()?;
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
 
         Ok(())
     }

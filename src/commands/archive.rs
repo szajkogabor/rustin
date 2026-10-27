@@ -17,7 +17,11 @@ impl ArchiveCommand {
             tracing::info!("No done tasks to archive");
         }
 
-        crate::commands::list::ListCommand { columns: vec![] }.run()?;
+        crate::commands::list::ListCommand {
+            columns: vec![],
+            tags: vec![],
+        }
+        .run()?;
         Ok(())
     }
 }

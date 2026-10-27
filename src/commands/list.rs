@@ -1,7 +1,7 @@
 use crate::commands::display::{
     TaskColumn, TaskColumns, build_task_table_rows, split_tasks, visible_task_columns,
 };
-use crate::store::Board;
+use crate::store::{Board, Task};
 use anyhow::Context;
 use anyhow::Result;
 use clap::Args;
@@ -19,12 +19,16 @@ pub struct ListCommand {
     /// Columns to display (default: all)
     #[arg(short, long, value_enum, num_args = 1..)]
     pub columns: Vec<TaskColumn>,
+
+    /// Only show tasks having any of these tags (case-insensitive)
+    #[arg(short, long = "tag", num_args = 1..)]
+    pub tags: Vec<String>,
 }
 
 impl ListCommand {
     pub fn run(&self) -> Result<()> {
         let board = Board::load()?;
-        let view = ListView::from_board(&board, &self.columns);
+        let view = ListView::from_board(&board, &self.columns, &self.tags);
 
         if io::stdout().is_terminal() {
             let mut terminal = InlineListTerminal::enter(view.viewport_height())?;
@@ -81,12 +85,19 @@ struct ListView {
 }
 
 impl ListView {
-    fn from_board(board: &Board, selected_columns: &[TaskColumn]) -> Self {
+    fn from_board(board: &Board, selected_columns: &[TaskColumn], tags: &[String]) -> Self {
+        let tasks: Vec<Task> = board
+            .tasks
+            .iter()
+            .filter(|task| tags.is_empty() || task.has_any_tag(tags))
+            .cloned()
+            .collect();
+
         Self {
             title: board.title.clone(),
-            columns: split_tasks(&board.tasks),
+            columns: split_tasks(&tasks),
             visible_columns: visible_task_columns(selected_columns),
-            is_empty: board.tasks.is_empty(),
+            is_empty: tasks.is_empty(),
         }
     }
 
@@ -222,6 +233,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 
@@ -229,6 +241,7 @@ mod tests {
     fn render_to_string_shows_board_title_and_table_headers() {
         let view = ListView::from_board(
             &board_with_tasks(vec![task(1, "Write tests", TaskStatus::Todo)]),
+            &[],
             &[],
         );
 
@@ -246,6 +259,7 @@ mod tests {
         let view = ListView::from_board(
             &board_with_tasks(vec![task(1, "Ship it", TaskStatus::Done)]),
             &[TaskColumn::Done],
+            &[],
         );
 
         let rendered = view.render_to_string(80);
@@ -258,7 +272,7 @@ mod tests {
 
     #[test]
     fn render_to_string_shows_empty_message() {
-        let view = ListView::from_board(&board_with_tasks(vec![]), &[]);
+        let view = ListView::from_board(&board_with_tasks(vec![]), &[], &[]);
 
         let rendered = view.render_to_string(80);
 
@@ -274,8 +288,25 @@ mod tests {
                 task(2, "Two", TaskStatus::Done),
             ]),
             &[],
+            &[],
         );
 
         assert_eq!(view.viewport_height(), 5);
+    }
+
+    #[test]
+    fn render_to_string_filters_by_tag() {
+        let mut tagged = task(1, "Tagged task", TaskStatus::Todo);
+        tagged.add_tags(["ui"]);
+        let view = ListView::from_board(
+            &board_with_tasks(vec![tagged, task(2, "Plain task", TaskStatus::Todo)]),
+            &[],
+            &["Ui".to_string()],
+        );
+
+        let rendered = view.render_to_string(80);
+
+        assert!(rendered.contains("[UI] Tagged task"));
+        assert!(!rendered.contains("Plain task"));
     }
 }

@@ -49,6 +49,7 @@ pub(crate) struct TaskRow {
     pub(crate) kind: String,
     pub(crate) status: String,
     pub(crate) description: Option<String>,
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
@@ -85,7 +86,7 @@ fn pad_to_width(text: &str, width: usize) -> String {
 pub(crate) fn format_task(task: &Task) -> String {
     let priority = priority_emoji(task.priority);
     let kind = kind_emoji(task.kind);
-    format!("{priority}[{:2}]{kind} {}", task.id, task.title)
+    format!("{priority}[{:2}]{kind} {}", task.id, task.display_title())
 }
 
 pub(crate) fn visible_task_columns(selected: &[TaskColumn]) -> Vec<TaskColumn> {
@@ -125,6 +126,9 @@ pub(crate) fn task_snapshot_lines(task: &TaskRow) -> Vec<String> {
         format!("Priority: {}", task.priority),
         format!("Kind: {}", task.kind),
     ];
+    if !task.tags.is_empty() {
+        lines.push(format!("Tags: {}", format_tags(&task.tags)));
+    }
     if let Some(desc) = task.description.as_deref().filter(|d| !d.trim().is_empty()) {
         lines.push(String::new());
         lines.extend(desc.lines().map(str::to_string));
@@ -149,6 +153,14 @@ pub(crate) fn kind_emoji(kind: TaskKind) -> String {
         TaskKind::Ci => "⚙️",
     };
     pad_to_width(emoji, 2)
+}
+
+pub(crate) fn format_tags(tags: &[String]) -> String {
+    if tags.is_empty() {
+        "(none)".to_string()
+    } else {
+        tags.join(", ")
+    }
 }
 
 pub(crate) fn status_label(status: &TaskStatus) -> &'static str {
@@ -182,6 +194,7 @@ pub(crate) fn split_tasks(tasks: &[Task]) -> TaskColumns {
             kind: kind_emoji(task.kind),
             status: status_label(&task.status).to_string(),
             description: task.description.clone(),
+            tags: task.tags.clone(),
         };
 
         match task.status {
@@ -203,6 +216,7 @@ pub(crate) fn task_detail_lines(task: &Task) -> Vec<String> {
     let mut lines = vec![
         format!("ID:          {}", task.id),
         format!("Title:       {}", task.title),
+        format!("Tags:        {}", format_tags(&task.tags)),
         format!("Kind:        {:?} {}", task.kind, kind_emoji(task.kind)),
         format!(
             "Priority:    {:?} {}",
@@ -254,6 +268,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 
@@ -272,6 +287,7 @@ mod tests {
             created_at,
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         }
     }
 
@@ -415,6 +431,7 @@ mod tests {
                 at: transitioned,
             }],
             deleted_at: None,
+            tags: vec![],
         };
 
         let lines = task_detail_lines(&task);
@@ -475,6 +492,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         };
 
         let lines = task_detail_lines(&task);

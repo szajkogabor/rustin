@@ -421,6 +421,7 @@ impl App {
                     created_at: Utc::now(),
                     transitions: vec![],
                     deleted_at: None,
+                    tags: vec![],
                 };
                 let new_id = task.id;
                 board.next_id += 1;
@@ -670,6 +671,7 @@ mod tests {
             kind: "+".to_string(),
             status: status.to_string(),
             description: None,
+            tags: vec![],
         }
     }
 
@@ -817,6 +819,7 @@ mod tests {
             created_at: Utc::now(),
             transitions: vec![],
             deleted_at: None,
+            tags: vec![],
         };
 
         let columns = split_tasks(std::slice::from_ref(&task));
